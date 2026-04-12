@@ -20,6 +20,20 @@ export default async function HomePage() {
 
   const lastMeal = latestFood?.[0];
 
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+
+  const { data: todaysFood, error: todaysFoodError } = olive
+    ? await supabase
+        .from("food_entries")
+        .select("calories, fed_at")
+        .eq("dog_id", olive.id)
+        .gte("fed_at", startOfToday.toISOString())
+    : { data: null, error: null };
+
+  const todaysCalories =
+    todaysFood?.reduce((sum, entry) => sum + (Number(entry.calories) || 0), 0) ?? 0;
+
   return (
     <main className="min-h-screen p-6">
       <div className="mx-auto max-w-md space-y-6">
@@ -48,8 +62,11 @@ export default async function HomePage() {
                 {foodError
                   ? "Could not load"
                   : lastMeal
-                    ? `${lastMeal.food_name}${lastMeal.calories ? ` (${lastMeal.calories} cal)` : ""}`
+                    ? `${lastMeal.food_name}${lastMeal.calories ? ` (${lastMeal.calories} cal)` : ""} at ${new Date(lastMeal.fed_at).toLocaleString()}`
                     : "Not logged yet"}
+              </p>
+              <p className="text-sm text-gray-600">
+                Today’s calories: {todaysFoodError ? "Could not load" : todaysCalories}
               </p>
               <p className="text-sm text-gray-600">Today’s walks: 0</p>
               <p className="text-sm text-gray-600">Next event: None</p>
