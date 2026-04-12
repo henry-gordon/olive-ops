@@ -8,6 +8,7 @@ export default function NewWalkPage() {
   const [endTime, setEndTime] = useState("");
   const [durationMinutes, setDurationMinutes] = useState("");
   const [locationNote, setLocationNote] = useState("");
+  const [reactivityLevel, setReactivityLevel] = useState("");
   const [notes, setNotes] = useState("");
   const [message, setMessage] = useState("");
 
@@ -46,12 +47,13 @@ export default function NewWalkPage() {
     setMessage("Saving...");
 
     const { error } = await supabase.from("walks").insert({
-      household_id: "fb2d14e0-289c-4e24-9998-9d7f9928fc03",
-      dog_id: "ca061b23-5812-4900-bb29-1b5dd444c313",
+      household_id: "PASTE_HOUSEHOLD_ID_HERE",
+      dog_id: "PASTE_DOG_ID_HERE",
       start_time: startTime,
       end_time: endTime || null,
       duration_minutes: finalDuration,
       location_note: locationNote || null,
+      reactivity_level: reactivityLevel || null,
       notes: notes || null,
       created_by: "Henry",
     });
@@ -65,6 +67,7 @@ export default function NewWalkPage() {
     setEndTime("");
     setDurationMinutes("");
     setLocationNote("");
+    setReactivityLevel("");
     setNotes("");
     setMessage("Walk saved.");
   }
@@ -119,6 +122,22 @@ export default function NewWalkPage() {
               className="w-full rounded-xl border p-3"
               placeholder="Bay Trail"
             />
+          </div>
+
+          <div className="space-y-1">
+            <label className="block text-sm font-medium">Reactivity Level</label>
+            <select
+              value={reactivityLevel}
+              onChange={(e) => setReactivityLevel(e.target.value)}
+              className="w-full rounded-xl border p-3"
+            >
+              <option value="">Select one</option>
+              <option value="none">None</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="very_high">Very high</option>
+            </select>
           </div>
 
           <div className="space-y-1">
