@@ -18,6 +18,16 @@ type WalkEntry = {
   notes: string | null;
 };
 
+type EventEntry = {
+  id: string;
+  event_type: string;
+  title: string;
+  starts_at: string;
+  ends_at: string | null;
+  location: string | null;
+  notes: string | null;
+};
+
 type HistoryItem =
   | {
       id: string;
@@ -30,6 +40,12 @@ type HistoryItem =
       type: "walk";
       timestamp: string;
       data: WalkEntry;
+    }
+  | {
+      id: string;
+      type: "event";
+      timestamp: string;
+      data: EventEntry;
     };
 
 export default async function HistoryPage() {
@@ -54,6 +70,15 @@ export default async function HistoryPage() {
         .limit(20)
     : { data: null, error: null };
 
+  const { data: eventEntries, error: eventError } = olive
+    ? await supabase
+        .from("events")
+        .select("id, event_type, title, starts_at, ends_at, location, notes")
+        .eq("dog_id", olive.id)
+        .order("starts_at", { ascending: false })
+        .limit(20)
+    : { data: null, error: null };
+
   const combinedHistory: HistoryItem[] = [
     ...(foodEntries?.map((entry: FoodEntry) => ({
       id: entry.id,
@@ -67,6 +92,12 @@ export default async function HistoryPage() {
       timestamp: entry.start_time,
       data: entry,
     })) ?? []),
+    ...(eventEntries?.map((entry: EventEntry) => ({
+      id: entry.id,
+      type: "event" as const,
+      timestamp: entry.starts_at,
+      data: entry,
+    })) ?? []),
   ].sort(
     (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
   );
@@ -78,11 +109,11 @@ export default async function HistoryPage() {
           <p className="text-sm text-gray-500">Olive Ops</p>
           <h1 className="text-3xl font-bold">History</h1>
           <p className="text-sm text-gray-600">
-            Recent food and walk activity for {olive?.name ?? "your dog"}.
+            Recent food, walk, and event activity for {olive?.name ?? "your dog"}.
           </p>
         </header>
 
-        {foodError || walkError ? (
+        {foodError || walkError || eventError ? (
           <p className="text-sm text-red-600">Could not load history.</p>
         ) : combinedHistory.length === 0 ? (
           <p className="text-sm text-gray-600">No history yet.</p>
@@ -113,7 +144,7 @@ export default async function HistoryPage() {
                       </p>
                     ) : null}
                   </div>
-                ) : (
+                ) : item.type === "walk" ? (
                   <div className="mt-2 space-y-1">
                     <p className="font-medium">Walk</p>
                     <p className="text-sm text-gray-600">
@@ -122,6 +153,26 @@ export default async function HistoryPage() {
                     <p className="text-sm text-gray-600">
                       Location: {item.data.location_note ?? "—"}
                     </p>
+                    {item.data.notes ? (
+                      <p className="text-sm text-gray-600">
+                        Notes: {item.data.notes}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="mt-2 space-y-1">
+                    <p className="font-medium">{item.data.title}</p>
+                    <p className="text-sm text-gray-600">
+                      Type: {item.data.event_type}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      Location: {item.data.location ?? "—"}
+                    </p>
+                    {item.data.ends_at ? (
+                      <p className="text-sm text-gray-600">
+                        Ends: {new Date(item.data.ends_at).toLocaleString()}
+                      </p>
+                    ) : null}
                     {item.data.notes ? (
                       <p className="text-sm text-gray-600">
                         Notes: {item.data.notes}
