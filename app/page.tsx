@@ -9,6 +9,9 @@ export default async function HomePage() {
 
   const olive = dogs?.[0];
 
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+
   const { data: latestFood, error: foodError } = olive
     ? await supabase
         .from("food_entries")
@@ -20,9 +23,6 @@ export default async function HomePage() {
 
   const lastMeal = latestFood?.[0];
 
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
-
   const { data: todaysFood, error: todaysFoodError } = olive
     ? await supabase
         .from("food_entries")
@@ -33,8 +33,8 @@ export default async function HomePage() {
 
   const todaysCalories =
     todaysFood?.reduce((sum, entry) => sum + (Number(entry.calories) || 0), 0) ?? 0;
-  
-    const { data: todaysWalks, error: walksError } = olive
+
+  const { data: todaysWalks, error: walksError } = olive
     ? await supabase
         .from("walks")
         .select("id")
@@ -79,8 +79,8 @@ export default async function HomePage() {
                 Today’s calories: {todaysFoodError ? "Could not load" : todaysCalories}
               </p>
               <p className="text-sm text-gray-600">
-  Today’s walks: {walksError ? "Could not load" : `${todaysWalkCount} walk${todaysWalkCount === 1 ? "" : "s"}`}   
-</p>
+                Today’s walks: {walksError ? "Could not load" : todaysWalkCount}
+              </p>
               <p className="text-sm text-gray-600">Next event: None</p>
               <p className="text-sm text-gray-600">Latest training note: None</p>
             </>
