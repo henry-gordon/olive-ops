@@ -12,6 +12,8 @@ export default async function HomePage() {
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
 
+  const nowIso = new Date().toISOString();
+
   const { data: latestFood, error: foodError } = olive
     ? await supabase
         .from("food_entries")
@@ -44,6 +46,18 @@ export default async function HomePage() {
 
   const todaysWalkCount = todaysWalks?.length ?? 0;
 
+  const { data: upcomingEvents, error: eventsError } = olive
+    ? await supabase
+        .from("events")
+        .select("title, event_type, starts_at, location")
+        .eq("dog_id", olive.id)
+        .gte("starts_at", nowIso)
+        .order("starts_at", { ascending: true })
+        .limit(1)
+    : { data: null, error: null };
+
+  const nextEvent = upcomingEvents?.[0];
+
   return (
     <main className="min-h-screen p-6">
       <div className="mx-auto max-w-md space-y-6">
@@ -65,9 +79,6 @@ export default async function HomePage() {
           ) : (
             <>
               <p className="text-sm text-gray-600">
-                Household ID: {olive?.household_id ?? "Not available"}
-              </p>
-              <p className="text-sm text-gray-600">
                 Last meal:{" "}
                 {foodError
                   ? "Could not load"
@@ -81,7 +92,14 @@ export default async function HomePage() {
               <p className="text-sm text-gray-600">
                 Today’s walks: {walksError ? "Could not load" : todaysWalkCount}
               </p>
-              <p className="text-sm text-gray-600">Next event: None</p>
+              <p className="text-sm text-gray-600">
+                Next event:{" "}
+                {eventsError
+                  ? "Could not load"
+                  : nextEvent
+                    ? `${nextEvent.title} (${nextEvent.event_type}) at ${new Date(nextEvent.starts_at).toLocaleString()}${nextEvent.location ? ` • ${nextEvent.location}` : ""}`
+                    : "None"}
+              </p>
               <p className="text-sm text-gray-600">Latest training note: None</p>
             </>
           )}
