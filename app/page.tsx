@@ -33,6 +33,16 @@ export default async function HomePage() {
 
   const todaysCalories =
     todaysFood?.reduce((sum, entry) => sum + (Number(entry.calories) || 0), 0) ?? 0;
+  
+    const { data: todaysWalks, error: walksError } = olive
+    ? await supabase
+        .from("walks")
+        .select("id")
+        .eq("dog_id", olive.id)
+        .gte("start_time", startOfToday.toISOString())
+    : { data: null, error: null };
+
+  const todaysWalkCount = todaysWalks?.length ?? 0;
 
   return (
     <main className="min-h-screen p-6">
@@ -68,7 +78,9 @@ export default async function HomePage() {
               <p className="text-sm text-gray-600">
                 Today’s calories: {todaysFoodError ? "Could not load" : todaysCalories}
               </p>
-              <p className="text-sm text-gray-600">Today’s walks: 0</p>
+              <p className="text-sm text-gray-600">
+  Today’s walks: {walksError ? "Could not load" : `${todaysWalkCount} walk${todaysWalkCount === 1 ? "" : "s"}`}   
+</p>
               <p className="text-sm text-gray-600">Next event: None</p>
               <p className="text-sm text-gray-600">Latest training note: None</p>
             </>
