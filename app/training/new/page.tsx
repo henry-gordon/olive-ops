@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { usePrimaryDog } from "@/lib/use-primary-dog";
+import { usePrimaryPet } from "@/lib/use-primary-pet";
 
 export default function NewTrainingPage() {
-  const { dog, loading: dogLoading, errorMessage: dogError } = usePrimaryDog();
+  const { pet, loading: petLoading, errorMessage: petError } = usePrimaryPet();
   const [skillName, setSkillName] = useState("");
   const [sessionAt, setSessionAt] = useState("");
   const [durationMinutes, setDurationMinutes] = useState("");
@@ -27,16 +27,16 @@ export default function NewTrainingPage() {
       return;
     }
 
-    if (!dog) {
-      setMessage(dogError ?? "Dog not loaded yet.");
+    if (!pet) {
+      setMessage(petError ?? "Pet not loaded yet.");
       return;
     }
 
     setMessage("Saving...");
 
     const { error } = await supabase.from("training_sessions").insert({
-      household_id: dog.household_id,
-      dog_id: dog.id,
+      household_id: pet.household_id,
+      pet_id: pet.id,
       skill_name: skillName.trim(),
       session_at: sessionAt,
       duration_minutes: durationMinutes ? Number(durationMinutes) : null,
@@ -58,18 +58,18 @@ export default function NewTrainingPage() {
     setMessage("Training session saved.");
   }
 
-  const formDisabled = dogLoading || !dog;
+  const formDisabled = petLoading || !pet;
 
   return (
     <main className="min-h-screen p-6">
       <div className="mx-auto max-w-md space-y-6">
         <h1 className="text-3xl font-bold">Add Training</h1>
 
-        {dogLoading ? (
-          <p className="text-sm text-gray-600">Loading dog…</p>
-        ) : dogError || !dog ? (
+        {petLoading ? (
+          <p className="text-sm text-gray-600">Loading pet…</p>
+        ) : petError || !pet ? (
           <p className="text-sm text-red-600">
-            {dogError ?? "Could not load dog."}
+            {petError ?? "Could not load pet."}
           </p>
         ) : null}
 

@@ -2,26 +2,26 @@
 
 import { useEffect, useState } from "react";
 import {
-  fetchPrimaryDog,
-  type PrimaryDogRow,
-} from "@/lib/primary-dog";
+  fetchPrimaryPet,
+  type PrimaryPetRow,
+} from "@/lib/primary-pet";
 
-export function usePrimaryDog() {
-  const [dog, setDog] = useState<PrimaryDogRow | null>(null);
+export function usePrimaryPet() {
+  const [pet, setPet] = useState<PrimaryPetRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const result = await fetchPrimaryDog();
+      const result = await fetchPrimaryPet();
       if (cancelled) return;
       setLoading(false);
       if (result.ok) {
-        setDog(result.dog);
+        setPet(result.pet);
         setErrorMessage(null);
       } else {
-        setDog(null);
+        setPet(null);
         setErrorMessage(result.errorMessage);
       }
     })();
@@ -30,5 +30,5 @@ export function usePrimaryDog() {
     };
   }, []);
 
-  return { dog, loading, errorMessage };
+  return { pet, loading, errorMessage };
 }

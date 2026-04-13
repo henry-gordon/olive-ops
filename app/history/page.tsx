@@ -1,4 +1,4 @@
-import { fetchPrimaryDog } from "@/lib/primary-dog";
+import { fetchPrimaryPet } from "@/lib/primary-pet";
 import { supabase } from "@/lib/supabase";
 import HistoryList from "./HistoryList";
 
@@ -47,41 +47,41 @@ type HistoryItem =
   | { id: string; type: "training"; timestamp: string; data: TrainingEntry };
 
 export default async function HistoryPage() {
-  const dogResult = await fetchPrimaryDog();
-  const olive = dogResult.ok ? dogResult.dog : null;
+  const petResult = await fetchPrimaryPet();
+  const primaryPet = petResult.ok ? petResult.pet : null;
 
-  const { data: foodEntries, error: foodError } = olive
+  const { data: foodEntries, error: foodError } = primaryPet
     ? await supabase
         .from("food_entries")
         .select("id, fed_at, food_name, calories, amount, notes")
-        .eq("dog_id", olive.id)
+        .eq("pet_id", primaryPet.id)
         .order("fed_at", { ascending: false })
         .limit(20)
     : { data: null, error: null };
 
-  const { data: walkEntries, error: walkError } = olive
+  const { data: walkEntries, error: walkError } = primaryPet
     ? await supabase
         .from("walks")
         .select("id, start_time, end_time, duration_minutes, location_note, reactivity_level, notes")
-        .eq("dog_id", olive.id)
+        .eq("pet_id", primaryPet.id)
         .order("start_time", { ascending: false })
         .limit(20)
     : { data: null, error: null };
 
-  const { data: eventEntries, error: eventError } = olive
+  const { data: eventEntries, error: eventError } = primaryPet
     ? await supabase
         .from("events")
         .select("id, event_type, title, starts_at, ends_at, location, notes")
-        .eq("dog_id", olive.id)
+        .eq("pet_id", primaryPet.id)
         .order("starts_at", { ascending: false })
         .limit(20)
     : { data: null, error: null };
 
-  const { data: trainingEntries, error: trainingError } = olive
+  const { data: trainingEntries, error: trainingError } = primaryPet
     ? await supabase
         .from("training_sessions")
         .select("id, skill_name, session_at, duration_minutes, success_rating, notes")
-        .eq("dog_id", olive.id)
+        .eq("pet_id", primaryPet.id)
         .order("session_at", { ascending: false })
         .limit(20)
     : { data: null, error: null };
@@ -118,13 +118,13 @@ export default async function HistoryPage() {
   return (
     <main className="min-h-screen p-6">
       <div className="mx-auto max-w-md">
-        {!dogResult.ok ? (
-          <p className="text-sm text-red-600">{dogResult.errorMessage}</p>
+        {!petResult.ok ? (
+          <p className="text-sm text-red-600">{petResult.errorMessage}</p>
         ) : foodError || walkError || eventError || trainingError ? (
           <p className="text-sm text-red-600">Could not load history.</p>
         ) : (
           <HistoryList
-            oliveName={olive?.name ?? "your dog"}
+            petName={primaryPet?.name ?? "your pet"}
             items={combinedHistory}
           />
         )}

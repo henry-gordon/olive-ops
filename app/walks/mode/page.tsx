@@ -8,7 +8,7 @@ import {
   useState,
 } from "react";
 import { supabase } from "@/lib/supabase";
-import { usePrimaryDog } from "@/lib/use-primary-dog";
+import { usePrimaryPet } from "@/lib/use-primary-pet";
 
 type InteractionKind = "dogs" | "strangers" | "wildlife" | "other";
 
@@ -134,7 +134,7 @@ function getCurrentCoords(): Promise<{ lat: number; lng: number } | null> {
 type Phase = "idle" | "walking" | "review";
 
 export default function WalkModePage() {
-  const { dog, loading: dogLoading, errorMessage: dogError } = usePrimaryDog();
+  const { pet, loading: petLoading, errorMessage: petError } = usePrimaryPet();
   const [phase, setPhase] = useState<Phase>("idle");
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [distanceMeters, setDistanceMeters] = useState(0);
@@ -268,8 +268,8 @@ export default function WalkModePage() {
   );
 
   async function saveWalkToSupabase() {
-    if (!dog) {
-      setSaveMessage(dogError ?? "Dog not loaded.");
+    if (!pet) {
+      setSaveMessage(petError ?? "Pet not loaded.");
       return;
     }
     setSaveMessage("Saving...");
@@ -289,8 +289,8 @@ export default function WalkModePage() {
     });
 
     const { error } = await supabase.from("walks").insert({
-      household_id: dog.household_id,
-      dog_id: dog.id,
+      household_id: pet.household_id,
+      pet_id: pet.id,
       start_time: new Date(startMs).toISOString(),
       end_time: new Date(endMs).toISOString(),
       duration_minutes: durationMinutes,
@@ -320,17 +320,17 @@ export default function WalkModePage() {
     setSaveMessage("Walk saved.");
   }
 
-  const dogReady = !dogLoading && dog;
-  const walkActionsDisabled = !dogReady;
+  const petReady = !petLoading && pet;
+  const walkActionsDisabled = !petReady;
 
   return (
     <main className="min-h-screen bg-zinc-50 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
       <div className="mx-auto flex min-h-screen max-w-md flex-col px-4 pt-[max(1rem,env(safe-area-inset-top))]">
-        {dogLoading ? (
-          <p className="mb-2 text-sm text-zinc-600">Loading dog…</p>
-        ) : dogError || !dog ? (
+        {petLoading ? (
+          <p className="mb-2 text-sm text-zinc-600">Loading pet…</p>
+        ) : petError || !pet ? (
           <p className="mb-2 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800">
-            {dogError ?? "Could not load dog."}
+            {petError ?? "Could not load pet."}
           </p>
         ) : null}
 

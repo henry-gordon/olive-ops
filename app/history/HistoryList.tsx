@@ -49,10 +49,10 @@ type HistoryItem =
 type FilterType = "all" | "food" | "walk" | "event" | "training";
 
 export default function HistoryList({
-  oliveName,
+  petName,
   items,
 }: {
-  oliveName: string;
+  petName: string;
   items: HistoryItem[];
 }) {
   const [filter, setFilter] = useState<FilterType>("all");
@@ -69,7 +69,7 @@ export default function HistoryList({
       <header className="space-y-2">
         <p className="text-sm text-gray-500">Olive Ops</p>
         <h1 className="text-3xl font-bold">History</h1>
-        <p className="text-sm text-gray-600">Recent activity for {oliveName}.</p>
+        <p className="text-sm text-gray-600">Recent activity for {petName}.</p>
       </header>
 
       <section className="flex flex-wrap gap-2">
