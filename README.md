@@ -90,7 +90,7 @@ Tables used by the app:
 
 There is a legacy `dogs` table and legacy `dog_id` columns from the first app iteration. New app code should use `pets` and `pet_id`. Do not add new dog-centric app concepts unless the product intentionally introduces species-specific behavior.
 
-Treat rankings use the `treat_rankings` table. Existing device-local rankings are migrated into Supabase the first time `/treats` loads for a pet with no shared board yet.
+Treat rankings use the `treat_rankings` table with a 0-100 preference score. Existing device-local rankings are migrated into Supabase the first time `/treats` loads for a pet with no shared board yet.
 
 ## Vercel Readiness
 

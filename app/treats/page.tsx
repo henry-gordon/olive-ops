@@ -6,6 +6,10 @@ import { supabase } from "@/lib/supabase";
 import { usePrimaryPet } from "@/lib/use-primary-pet";
 
 const STORAGE_PREFIX = "olive-ops-treat-rankings";
+const MAX_TREAT_SCORE = 100;
+const NEW_TREAT_SCORE = 75;
+const STARTING_TREAT_SCORE = 100;
+const BOOTSTRAP_SCORE_STEP = 8;
 
 const treatTypes = [
   "crunchy",
@@ -16,6 +20,16 @@ const treatTypes = [
   "topper",
   "other",
 ] as const;
+
+const treatTypeEmoji: Record<TreatType, string> = {
+  crunchy: "🥨",
+  soft: "🍪",
+  chew: "🦴",
+  fresh: "🥕",
+  frozen: "🧊",
+  topper: "✨",
+  other: "🐾",
+};
 
 type TreatType = (typeof treatTypes)[number];
 type FilterType = "all" | TreatType;
@@ -74,20 +88,25 @@ function readLocalTreats(petId: string): Treat[] {
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
 
-    return parsed.filter((item): item is Treat => {
-      if (typeof item !== "object" || item === null) return false;
-      const treat = item as Treat;
-      return (
-        typeof treat.id === "string" &&
-        typeof treat.name === "string" &&
-        typeof treat.brand === "string" &&
-        isTreatType(treat.type) &&
-        typeof treat.score === "number" &&
-        typeof treat.wins === "number" &&
-        typeof treat.losses === "number" &&
-        typeof treat.createdAt === "string"
-      );
-    });
+    return parsed
+      .filter((item): item is Treat => {
+        if (typeof item !== "object" || item === null) return false;
+        const treat = item as Treat;
+        return (
+          typeof treat.id === "string" &&
+          typeof treat.name === "string" &&
+          typeof treat.brand === "string" &&
+          isTreatType(treat.type) &&
+          typeof treat.score === "number" &&
+          typeof treat.wins === "number" &&
+          typeof treat.losses === "number" &&
+          typeof treat.createdAt === "string"
+        );
+      })
+      .map((treat) => ({
+        ...treat,
+        score: normalizeTreatScore(treat.score),
+      }));
   } catch {
     return [];
   }
@@ -100,13 +119,22 @@ function rankTreats(treats: Treat[]) {
   });
 }
 
+function clampTreatScore(score: number) {
+  return Math.max(0, Math.min(MAX_TREAT_SCORE, Math.round(score)));
+}
+
+function normalizeTreatScore(score: number) {
+  if (score <= MAX_TREAT_SCORE) return clampTreatScore(score);
+  return clampTreatScore(STARTING_TREAT_SCORE - Math.max(0, 1500 - score) / 9);
+}
+
 function createTreat(draft: DraftTreat, score: number): Treat {
   return {
     id: crypto.randomUUID(),
     name: draft.name.trim(),
     brand: draft.brand.trim(),
     type: draft.type,
-    score,
+    score: clampTreatScore(score),
     wins: 0,
     losses: 0,
     createdAt: new Date().toISOString(),
@@ -114,21 +142,21 @@ function createTreat(draft: DraftTreat, score: number): Treat {
 }
 
 function scoreMatch(winner: Treat, loser: Treat) {
-  const expectedWinner =
-    1 / (1 + Math.pow(10, (loser.score - winner.score) / 400));
-  const expectedLoser =
-    1 / (1 + Math.pow(10, (winner.score - loser.score) / 400));
-  const k = 44;
+  const gap = loser.score - winner.score;
+  const upsetBonus = gap > 0 ? Math.min(6, Math.ceil(gap / 8)) : 0;
+  const favoritePenalty = gap < 0 ? Math.min(5, Math.ceil(Math.abs(gap) / 18)) : 0;
+  const winnerDelta = 4 + upsetBonus;
+  const loserDelta = 2 + favoritePenalty;
 
   return {
     winner: {
       ...winner,
-      score: Math.round(winner.score + k * (1 - expectedWinner)),
+      score: clampTreatScore(winner.score + winnerDelta),
       wins: winner.wins + 1,
     },
     loser: {
       ...loser,
-      score: Math.round(loser.score + k * (0 - expectedLoser)),
+      score: clampTreatScore(loser.score - loserDelta),
       losses: loser.losses + 1,
     },
   };
@@ -154,10 +182,43 @@ function rowToTreat(row: TreatRow): Treat | null {
     name: row.name,
     brand: row.brand ?? "",
     type: row.type,
-    score: row.score,
+    score: normalizeTreatScore(row.score),
     wins: row.wins,
     losses: row.losses,
     createdAt: row.created_at,
+  };
+}
+
+function getScoreMood(score: number) {
+  if (score >= 92) {
+    return {
+      emoji: "🏆",
+      label: "Elite",
+      className: "border-emerald-300 bg-emerald-50 text-emerald-700",
+      barClassName: "bg-emerald-500",
+    };
+  }
+  if (score >= 82) {
+    return {
+      emoji: "😍",
+      label: "Favorite",
+      className: "border-sky-300 bg-sky-50 text-sky-700",
+      barClassName: "bg-sky-500",
+    };
+  }
+  if (score >= 70) {
+    return {
+      emoji: "😋",
+      label: "Solid",
+      className: "border-amber-300 bg-amber-50 text-amber-700",
+      barClassName: "bg-amber-500",
+    };
+  }
+  return {
+    emoji: "🤔",
+    label: "Maybe",
+    className: "border-rose-300 bg-rose-50 text-rose-700",
+    barClassName: "bg-rose-500",
   };
 }
 
@@ -169,7 +230,7 @@ function treatToRow(pet: PrimaryPetRow, treat: Treat) {
     name: treat.name,
     brand: treat.brand,
     type: treat.type,
-    score: treat.score,
+    score: clampTreatScore(treat.score),
     wins: treat.wins,
     losses: treat.losses,
     created_at: treat.createdAt,
@@ -326,9 +387,8 @@ function TreatRankingApp({ pet }: { pet: PrimaryPetRow }) {
       return;
     }
 
-    const startingScore = 1500;
     const seededTreats = filledDrafts.map((draft, index) =>
-      createTreat(draft, startingScore - index * 90)
+      createTreat(draft, STARTING_TREAT_SCORE - index * BOOTSTRAP_SCORE_STEP)
     );
 
     setIsSaving(true);
@@ -361,7 +421,7 @@ function TreatRankingApp({ pet }: { pet: PrimaryPetRow }) {
       return;
     }
 
-    const treat = createTreat(newTreat, 1500);
+    const treat = createTreat(newTreat, NEW_TREAT_SCORE);
     setSession({
       treat,
       opponents: comparisonCandidates(treats),
@@ -504,7 +564,7 @@ function TreatRankingApp({ pet }: { pet: PrimaryPetRow }) {
                     disabled={isSaving}
                     className="rounded-lg border p-4 text-left font-medium disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {session.treat.name}
+                    {treatTypeEmoji[session.treat.type]} {session.treat.name}
                     {session.treat.brand ? (
                       <span className="block text-sm font-normal text-gray-500">
                         {session.treat.brand}
@@ -517,7 +577,7 @@ function TreatRankingApp({ pet }: { pet: PrimaryPetRow }) {
                     disabled={isSaving}
                     className="rounded-lg border p-4 text-left font-medium disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {activeOpponent.name}
+                    {treatTypeEmoji[activeOpponent.type]} {activeOpponent.name}
                     {activeOpponent.brand ? (
                       <span className="block text-sm font-normal text-gray-500">
                         {activeOpponent.brand}
@@ -613,14 +673,36 @@ function TreatRankingApp({ pet }: { pet: PrimaryPetRow }) {
                           <p className="text-sm font-medium text-gray-500">
                             #{filter === "all" ? index + 1 : rankedTreats.findIndex((item) => item.id === treat.id) + 1}
                           </p>
-                          <h3 className="text-lg font-semibold">{treat.name}</h3>
+                          <h3 className="text-lg font-semibold">
+                            {treatTypeEmoji[treat.type]} {treat.name}
+                          </h3>
                           <p className="text-sm text-gray-600">
                             {treat.brand ? `${treat.brand} - ` : ""}
                             {treat.type[0].toUpperCase() + treat.type.slice(1)}
                           </p>
                         </div>
-                        <div className="text-right">
-                          <p className="font-mono text-lg font-semibold">{treat.score}</p>
+                        <div className="min-w-24 text-right">
+                          {(() => {
+                            const mood = getScoreMood(treat.score);
+                            return (
+                              <>
+                                <p
+                                  className={`inline-flex items-center rounded-full border px-2 py-1 font-mono text-lg font-semibold ${mood.className}`}
+                                >
+                                  {mood.emoji} {treat.score}/100
+                                </p>
+                                <div className="mt-2 h-2 w-full rounded-full bg-gray-100">
+                                  <div
+                                    className={`h-2 rounded-full ${mood.barClassName}`}
+                                    style={{ width: `${treat.score}%` }}
+                                  />
+                                </div>
+                                <p className="mt-1 text-xs font-medium text-gray-500">
+                                  {mood.label}
+                                </p>
+                              </>
+                            );
+                          })()}
                           <p className="text-xs text-gray-500">
                             {treat.wins}-{treat.losses}
                           </p>

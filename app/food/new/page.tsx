@@ -1,17 +1,41 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { usePrimaryPet } from "@/lib/use-primary-pet";
 
 const FOOD_TYPES_STORAGE_KEY = "olive-ops-food-types";
 const LEGACY_PRESETS_STORAGE_KEY = "olive-ops-food-presets";
+const OTHER_UNIT_VALUE = "__other__";
+
+const FOOD_UNIT_OPTIONS = [
+  "cup",
+  "scoop",
+  "gram",
+  "ounce",
+  "piece",
+  "treat",
+  "serving",
+  "packet",
+  "can",
+  "tablespoon",
+  "teaspoon",
+  "Kong",
+  "lick mat",
+] as const;
 
 type FoodType = {
   id: string;
   name: string;
   unit: string;
   caloriesPerUnit: number;
+};
+
+type FoodTypeRow = {
+  id: string;
+  name: string;
+  unit: string;
+  calories_per_unit: number | string;
 };
 
 type LegacyFoodPreset = {
@@ -82,6 +106,15 @@ function persistFoodTypes(foodTypes: FoodType[]) {
   localStorage.setItem(FOOD_TYPES_STORAGE_KEY, JSON.stringify(foodTypes));
 }
 
+function rowToFoodType(row: FoodTypeRow): FoodType {
+  return {
+    id: row.id,
+    name: row.name,
+    unit: row.unit,
+    caloriesPerUnit: Number(row.calories_per_unit),
+  };
+}
+
 function formatNumber(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
@@ -89,11 +122,14 @@ function formatNumber(value: number) {
 export default function NewFoodPage() {
   const { pet, loading: petLoading, errorMessage: petError } = usePrimaryPet();
   const [foodTypes, setFoodTypes] = useState<FoodType[]>(loadFoodTypes);
+  const [loadingFoodTypes, setLoadingFoodTypes] = useState(true);
+  const [showFoodTypeForm, setShowFoodTypeForm] = useState(false);
   const [selectedFoodTypeId, setSelectedFoodTypeId] = useState("");
   const [quantity, setQuantity] = useState("");
   const [notes, setNotes] = useState("");
   const [newFoodName, setNewFoodName] = useState("");
-  const [newFoodUnit, setNewFoodUnit] = useState("");
+  const [newFoodUnit, setNewFoodUnit] = useState<string>(FOOD_UNIT_OPTIONS[0]);
+  const [customFoodUnit, setCustomFoodUnit] = useState("");
   const [newCaloriesPerUnit, setNewCaloriesPerUnit] = useState("");
   const [message, setMessage] = useState("");
 
@@ -108,11 +144,100 @@ export default function NewFoodPage() {
     return parsedQuantity * selectedFoodType.caloriesPerUnit;
   }, [quantity, selectedFoodType]);
 
-  function handleSaveFoodType() {
+  useEffect(() => {
+    if (petLoading) return;
+    if (!pet) {
+      setLoadingFoodTypes(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadSharedFoodTypes() {
+      setLoadingFoodTypes(true);
+      const { data, error } = await supabase
+        .from("food_types")
+        .select("id, name, unit, calories_per_unit")
+        .eq("household_id", pet.household_id)
+        .eq("pet_id", pet.id)
+        .order("name", { ascending: true });
+
+      if (cancelled) return;
+
+      if (error) {
+        setLoadingFoodTypes(false);
+        setMessage(`Could not load food types: ${error.message}`);
+        return;
+      }
+
+      const sharedFoodTypes = ((data ?? []) as FoodTypeRow[])
+        .map(rowToFoodType)
+        .filter(isFoodType);
+
+      if (sharedFoodTypes.length > 0) {
+        setFoodTypes(sharedFoodTypes);
+        persistFoodTypes(sharedFoodTypes);
+        setLoadingFoodTypes(false);
+        return;
+      }
+
+      const localFoodTypes = loadFoodTypes();
+      if (localFoodTypes.length === 0) {
+        setFoodTypes([]);
+        setLoadingFoodTypes(false);
+        return;
+      }
+
+      const { data: inserted, error: insertError } = await supabase
+        .from("food_types")
+        .insert(
+          localFoodTypes.map((foodType) => ({
+            household_id: pet.household_id,
+            pet_id: pet.id,
+            name: foodType.name,
+            unit: foodType.unit,
+            calories_per_unit: foodType.caloriesPerUnit,
+            created_by: "Henry",
+          }))
+        )
+        .select("id, name, unit, calories_per_unit");
+
+      if (cancelled) return;
+
+      if (insertError) {
+        setFoodTypes(localFoodTypes);
+        setLoadingFoodTypes(false);
+        setMessage(`Could not sync local food types: ${insertError.message}`);
+        return;
+      }
+
+      const syncedFoodTypes = ((inserted ?? []) as FoodTypeRow[])
+        .map(rowToFoodType)
+        .filter(isFoodType);
+      setFoodTypes(syncedFoodTypes);
+      persistFoodTypes(syncedFoodTypes);
+      setLoadingFoodTypes(false);
+      setMessage("Synced this device's food types for the household.");
+    }
+
+    loadSharedFoodTypes();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pet, petLoading]);
+
+  async function handleSaveFoodType() {
     setMessage("");
 
+    if (!pet) {
+      setMessage(petError ?? "Pet not loaded yet.");
+      return;
+    }
+
     const name = newFoodName.trim();
-    const unit = newFoodUnit.trim();
+    const unit =
+      newFoodUnit === OTHER_UNIT_VALUE ? customFoodUnit.trim() : newFoodUnit;
     const caloriesPerUnit = Number(newCaloriesPerUnit);
 
     if (!name) {
@@ -142,25 +267,48 @@ export default function NewFoodPage() {
       return;
     }
 
-    const nextFoodType: FoodType = {
-      id: crypto.randomUUID(),
-      name,
-      unit,
-      caloriesPerUnit,
-    };
+    const { data, error } = await supabase
+      .from("food_types")
+      .insert({
+        household_id: pet.household_id,
+        pet_id: pet.id,
+        name,
+        unit,
+        calories_per_unit: caloriesPerUnit,
+        created_by: "Henry",
+      })
+      .select("id, name, unit, calories_per_unit")
+      .single();
 
-    const updated = [...foodTypes, nextFoodType];
+    if (error) {
+      setMessage(`Could not save food type: ${error.message}`);
+      return;
+    }
+
+    const nextFoodType = rowToFoodType(data as FoodTypeRow);
+    const updated = [...foodTypes, nextFoodType].sort((a, b) =>
+      a.name.localeCompare(b.name)
+    );
     setFoodTypes(updated);
     persistFoodTypes(updated);
     setSelectedFoodTypeId(nextFoodType.id);
     setQuantity("1");
     setNewFoodName("");
-    setNewFoodUnit("");
+    setNewFoodUnit(FOOD_UNIT_OPTIONS[0]);
+    setCustomFoodUnit("");
     setNewCaloriesPerUnit("");
+    setShowFoodTypeForm(false);
     setMessage(`Saved food type "${name}".`);
   }
 
-  function handleDeleteFoodType(id: string) {
+  async function handleDeleteFoodType(id: string) {
+    setMessage("");
+    const { error } = await supabase.from("food_types").delete().eq("id", id);
+    if (error) {
+      setMessage(`Could not remove food type: ${error.message}`);
+      return;
+    }
+
     const updated = foodTypes.filter((foodType) => foodType.id !== id);
     setFoodTypes(updated);
     persistFoodTypes(updated);
@@ -231,16 +379,30 @@ export default function NewFoodPage() {
           </p>
         ) : null}
 
-        <section className="space-y-3 rounded-lg border border-gray-200 p-4">
-          <div>
-            <h2 className="text-lg font-semibold">Food types</h2>
-            <p className="text-sm text-gray-600">
-              Add foods like kibble, treats, Kong, or lick mat once with their
-              unit and calories.
-            </p>
-          </div>
+        <section className="space-y-3">
+          <button
+            type="button"
+            onClick={() => setShowFoodTypeForm((current) => !current)}
+            className="w-full rounded-lg border border-gray-300 p-3 text-left text-sm font-medium text-gray-800"
+            aria-expanded={showFoodTypeForm}
+            aria-controls="food-type-form"
+          >
+            {showFoodTypeForm ? "Hide Food Type" : "Add Food Type"}
+          </button>
 
-          <div className="space-y-3">
+          {showFoodTypeForm ? (
+          <div
+            id="food-type-form"
+            className="space-y-3 rounded-lg border border-gray-200 p-4"
+          >
+            <div>
+              <h2 className="text-lg font-semibold">Food types</h2>
+              <p className="text-sm text-gray-600">
+                Add foods like kibble, treats, Kong, or lick mat once with their
+                unit and calories.
+              </p>
+            </div>
+
             <div className="space-y-1">
               <label className="block text-sm font-medium">Food type name</label>
               <input
@@ -254,12 +416,26 @@ export default function NewFoodPage() {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-1">
                 <label className="block text-sm font-medium">Unit</label>
-                <input
+                <select
                   value={newFoodUnit}
                   onChange={(e) => setNewFoodUnit(e.target.value)}
-                  className="w-full rounded-lg border p-3"
-                  placeholder="cup"
-                />
+                  className="w-full rounded-lg border border-gray-300 bg-white p-3"
+                >
+                  {FOOD_UNIT_OPTIONS.map((unit) => (
+                    <option key={unit} value={unit}>
+                      {unit}
+                    </option>
+                  ))}
+                  <option value={OTHER_UNIT_VALUE}>Other</option>
+                </select>
+                {newFoodUnit === OTHER_UNIT_VALUE ? (
+                  <input
+                    value={customFoodUnit}
+                    onChange={(e) => setCustomFoodUnit(e.target.value)}
+                    className="mt-2 w-full rounded-lg border p-3"
+                    placeholder="Custom unit"
+                  />
+                ) : null}
               </div>
 
               <div className="space-y-1">
@@ -286,6 +462,7 @@ export default function NewFoodPage() {
               Save Food Type
             </button>
           </div>
+          ) : null}
         </section>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -303,7 +480,9 @@ export default function NewFoodPage() {
               className="w-full rounded-lg border border-gray-300 bg-white p-3"
               required
             >
-              <option value="">Choose food type</option>
+              <option value="">
+                {loadingFoodTypes ? "Loading food types..." : "Choose food type"}
+              </option>
               {foodTypes.map((foodType) => (
                 <option key={foodType.id} value={foodType.id}>
                   {foodType.name} - {formatNumber(foodType.caloriesPerUnit)} cal

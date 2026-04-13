@@ -114,28 +114,28 @@ export default async function HomePage() {
             href="/walks/mode"
             className="col-span-2 rounded-2xl border-2 border-emerald-600 bg-emerald-50 py-4 text-center text-base font-semibold text-emerald-900 dark:border-emerald-500 dark:bg-emerald-950 dark:text-emerald-100"
           >
-            Walk Mode (GPS)
+            🐾 Walk Mode (GPS)
           </Link>
           <Link href="/food/new" className="rounded-2xl border border-gray-200 p-4 font-medium dark:border-zinc-800 dark:bg-zinc-900">
-            Add Food
+            🥣 Add Food
           </Link>
           <Link href="/treats" className="rounded-2xl border border-gray-200 p-4 font-medium dark:border-zinc-800 dark:bg-zinc-900">
-            Treat Rankings
+            🦴 Treat Rankings
           </Link>
           <Link href="/walks/new" className="rounded-2xl border border-gray-200 p-4 font-medium dark:border-zinc-800 dark:bg-zinc-900">
-            Add Walk
+            🐕 Add Walk
           </Link>
           <Link href="/events/new" className="rounded-2xl border border-gray-200 p-4 font-medium dark:border-zinc-800 dark:bg-zinc-900">
-            Add Event
+            📅 Add Event
           </Link>
           <Link href="/training/new" className="rounded-2xl border border-gray-200 p-4 font-medium dark:border-zinc-800 dark:bg-zinc-900">
-            Add Training
+            🎓 Add Training
           </Link>
         </section>
 
         <section>
           <Link href="/history" className="text-sm underline">
-            View History
+            📜 View History
           </Link>
         </section>
       </div>
