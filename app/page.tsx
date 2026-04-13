@@ -59,14 +59,14 @@ export default async function HomePage() {
     <main className="min-h-screen p-6">
       <div className="mx-auto max-w-md space-y-6">
         <header className="space-y-2">
-          <p className="text-sm text-gray-500">Olive Ops</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Olive Ops</p>
           <h1 className="text-3xl font-bold">Today</h1>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 dark:text-gray-300">
             A shared home for Olive’s food, walks, events, and training.
           </p>
         </header>
 
-        <section className="rounded-2xl border p-4 space-y-2">
+        <section className="rounded-2xl border border-gray-200 p-4 space-y-2 dark:border-zinc-800 dark:bg-zinc-900">
           <h2 className="text-lg font-semibold">
             {olive ? `${olive.name ?? "Dog"} Summary` : "Dog Summary"}
           </h2>
@@ -75,7 +75,7 @@ export default async function HomePage() {
             <p className="text-sm text-red-600">{dogResult.errorMessage}</p>
           ) : (
             <>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-gray-600 dark:text-gray-300">
                 Last meal:{" "}
                 {foodError
                   ? "Could not load"
@@ -83,13 +83,13 @@ export default async function HomePage() {
                     ? `${lastMeal.food_name}${lastMeal.calories ? ` (${lastMeal.calories} cal)` : ""} at ${new Date(lastMeal.fed_at).toLocaleString()}`
                     : "Not logged yet"}
               </p>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-gray-600 dark:text-gray-300">
                 Today’s calories: {todaysFoodError ? "Could not load" : todaysCalories}
               </p>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-gray-600 dark:text-gray-300">
                 Today’s walks: {walksError ? "Could not load" : todaysWalkCount}
               </p>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-gray-600 dark:text-gray-300">
                 Next event:{" "}
                 {eventsError
                   ? "Could not load"
@@ -97,7 +97,7 @@ export default async function HomePage() {
                     ? `${nextEvent.title} (${nextEvent.event_type}) at ${new Date(nextEvent.starts_at).toLocaleString()}${nextEvent.location ? ` • ${nextEvent.location}` : ""}`
                     : "None"}
               </p>
-              <p className="text-sm text-gray-600">Latest training note: None</p>
+              <p className="text-sm text-gray-600 dark:text-gray-300">Latest training note: None</p>
             </>
           )}
         </section>
@@ -105,20 +105,20 @@ export default async function HomePage() {
         <section className="grid grid-cols-2 gap-3">
           <Link
             href="/walks/mode"
-            className="col-span-2 rounded-2xl border-2 border-emerald-600 bg-emerald-50 py-4 text-center text-base font-semibold text-emerald-900"
+            className="col-span-2 rounded-2xl border-2 border-emerald-600 bg-emerald-50 py-4 text-center text-base font-semibold text-emerald-900 dark:border-emerald-500 dark:bg-emerald-950 dark:text-emerald-100"
           >
             Walk Mode (GPS)
           </Link>
-          <Link href="/food/new" className="rounded-2xl border p-4 font-medium">
+          <Link href="/food/new" className="rounded-2xl border border-gray-200 p-4 font-medium dark:border-zinc-800 dark:bg-zinc-900">
             Add Food
           </Link>
-          <Link href="/walks/new" className="rounded-2xl border p-4 font-medium">
+          <Link href="/walks/new" className="rounded-2xl border border-gray-200 p-4 font-medium dark:border-zinc-800 dark:bg-zinc-900">
             Add Walk
           </Link>
-          <Link href="/events/new" className="rounded-2xl border p-4 font-medium">
+          <Link href="/events/new" className="rounded-2xl border border-gray-200 p-4 font-medium dark:border-zinc-800 dark:bg-zinc-900">
             Add Event
           </Link>
-          <Link href="/training/new" className="rounded-2xl border p-4 font-medium">
+          <Link href="/training/new" className="rounded-2xl border border-gray-200 p-4 font-medium dark:border-zinc-800 dark:bg-zinc-900">
             Add Training
           </Link>
         </section>

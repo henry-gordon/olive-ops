@@ -448,15 +448,10 @@ export default function WalkModePage() {
               <p className="font-semibold text-zinc-900">Summary</p>
               <p className="mt-2">
                 Duration: {formatElapsed(elapsedSeconds)} (
-                {Math.max(
-                  1,
-                  Math.round(
-                    (walkEndMsRef.current - walkStartMsRef.current) / 60000
-                  )
-                )}{" "}
+                {Math.max(1, Math.round(elapsedSeconds / 60))}{" "}
                 min)
               </p>
-              <p>Distance: ≈ {formatDistance(distanceAccumRef.current)}</p>
+              <p>Distance: ≈ {formatDistance(distanceMeters)}</p>
               <p>Interactions logged: {interactions.length}</p>
             </section>
 

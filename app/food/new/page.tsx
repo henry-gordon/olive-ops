@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { usePrimaryDog } from "@/lib/use-primary-dog";
 
@@ -48,17 +48,13 @@ function persistPresets(presets: FoodPreset[]) {
 
 export default function NewFoodPage() {
   const { dog, loading: dogLoading, errorMessage: dogError } = usePrimaryDog();
-  const [presets, setPresets] = useState<FoodPreset[]>([]);
+  const [presets, setPresets] = useState<FoodPreset[]>(loadPresets);
   const [selectedPresetId, setSelectedPresetId] = useState("");
   const [foodName, setFoodName] = useState("");
   const [calories, setCalories] = useState("");
   const [amount, setAmount] = useState("");
   const [notes, setNotes] = useState("");
   const [message, setMessage] = useState("");
-
-  useEffect(() => {
-    setPresets(loadPresets());
-  }, []);
 
   function applyPreset(id: string) {
     setSelectedPresetId(id);
@@ -78,13 +74,13 @@ export default function NewFoodPage() {
     setMessage("");
     const name = foodName.trim();
     if (!name) {
-      setMessage("Enter a food name before saving a preset.");
+      setMessage("🍽️ Enter a food name before saving a preset.");
       return;
     }
 
     const cal = calories.trim() ? Number(calories) : null;
     if (calories.trim() && (cal === null || Number.isNaN(cal))) {
-      setMessage("Calories must be a valid number for this preset.");
+      setMessage("🔢 Calories must be a valid number for this preset.");
       return;
     }
 
@@ -99,7 +95,7 @@ export default function NewFoodPage() {
     setPresets(updated);
     persistPresets(updated);
     setSelectedPresetId(next.id);
-    setMessage(`Saved preset “${name}”.`);
+    setMessage(`⭐ Saved preset “${name}”.`);
   }
 
   function handleDeletePreset(id: string) {
@@ -109,16 +105,16 @@ export default function NewFoodPage() {
     if (selectedPresetId === id) {
       setSelectedPresetId("");
     }
-    setMessage("Preset removed.");
+    setMessage("🧹 Preset removed.");
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!dog) {
-      setMessage(dogError ?? "Dog not loaded yet.");
+      setMessage(dogError ?? "🐾 Dog not loaded yet.");
       return;
     }
-    setMessage("Saving...");
+    setMessage("💾 Saving...");
 
     const { error } = await supabase.from("food_entries").insert({
       household_id: dog.household_id,
@@ -140,7 +136,7 @@ export default function NewFoodPage() {
     setAmount("");
     setNotes("");
     clearPresetSelection();
-    setMessage("Food entry saved.");
+    setMessage("🥣 Food entry saved.");
   }
 
   const formDisabled = dogLoading || !dog;
@@ -148,20 +144,20 @@ export default function NewFoodPage() {
   return (
     <main className="min-h-screen p-6">
       <div className="mx-auto max-w-md space-y-6">
-        <h1 className="text-3xl font-bold">Add Food</h1>
+        <h1 className="text-3xl font-bold">🥣 Add Food</h1>
 
         {dogLoading ? (
-          <p className="text-sm text-gray-600">Loading dog…</p>
+          <p className="text-sm text-gray-600">🐾 Loading dog…</p>
         ) : dogError || !dog ? (
           <p className="text-sm text-red-600">
-            {dogError ?? "Could not load dog."}
+            {dogError ?? "🐾 Could not load dog."}
           </p>
         ) : null}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1">
             <label className="block text-sm font-medium" htmlFor="food-preset">
-              Quick pick
+              ⚡ Quick pick
             </label>
             <select
               id="food-preset"
@@ -169,23 +165,23 @@ export default function NewFoodPage() {
               onChange={(e) => applyPreset(e.target.value)}
               className="w-full rounded-xl border border-gray-300 bg-white p-3"
             >
-              <option value="">Custom entry</option>
+              <option value="">✨ Custom entry</option>
               {presets.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
-                  {p.amount ? ` — ${p.amount}` : ""}
-                  {p.calories != null ? ` (${p.calories} cal)` : ""}
+                  {p.amount ? ` 🥄 ${p.amount}` : ""}
+                  {p.calories != null ? ` 🔥 ${p.calories} cal` : ""}
                 </option>
               ))}
             </select>
             <p className="text-xs text-gray-500">
-              Choosing a preset fills name, amount, and calories for a usual
+              ⭐ Choosing a preset fills name, amount, and calories for a usual
               serving.
             </p>
           </div>
 
           <div className="space-y-1">
-            <label className="block text-sm font-medium">Food Name</label>
+            <label className="block text-sm font-medium">🍽️ Food Name</label>
             <input
               value={foodName}
               onChange={(e) => {
@@ -199,7 +195,7 @@ export default function NewFoodPage() {
           </div>
 
           <div className="space-y-1">
-            <label className="block text-sm font-medium">Calories</label>
+            <label className="block text-sm font-medium">🔥 Calories</label>
             <input
               value={calories}
               onChange={(e) => {
@@ -213,7 +209,7 @@ export default function NewFoodPage() {
           </div>
 
           <div className="space-y-1">
-            <label className="block text-sm font-medium">Amount</label>
+            <label className="block text-sm font-medium">🥄 Amount</label>
             <input
               value={amount}
               onChange={(e) => {
@@ -226,7 +222,7 @@ export default function NewFoodPage() {
           </div>
 
           <div className="space-y-1">
-            <label className="block text-sm font-medium">Notes</label>
+            <label className="block text-sm font-medium">📝 Notes</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
@@ -241,10 +237,10 @@ export default function NewFoodPage() {
             onClick={handleSavePreset}
             className="w-full rounded-xl border border-dashed border-gray-400 p-3 text-sm font-medium text-gray-700"
           >
-            Save as preset
+            ⭐ Save as preset
           </button>
           <p className="text-xs text-gray-500 -mt-2">
-            Stores the current name, amount, and calories for the dropdown
+            💡 Stores the current name, amount, and calories for the dropdown
             above (saved on this device).
           </p>
 
@@ -253,14 +249,14 @@ export default function NewFoodPage() {
             disabled={formDisabled}
             className="w-full rounded-xl border p-3 font-medium disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Save Food Entry
+            🥣 Save Food Entry
           </button>
         </form>
 
         {presets.length > 0 ? (
           <section className="space-y-2 rounded-xl border border-gray-200 p-4">
             <h2 className="text-sm font-semibold text-gray-700">
-              Saved presets
+              ⭐ Saved presets
             </h2>
             <ul className="space-y-2 text-sm">
               {presets.map((p) => (
@@ -271,10 +267,10 @@ export default function NewFoodPage() {
                   <span className="text-gray-800">
                     <span className="font-medium">{p.name}</span>
                     {p.amount ? (
-                      <span className="text-gray-600"> · {p.amount}</span>
+                      <span className="text-gray-600"> 🥄 {p.amount}</span>
                     ) : null}
                     {p.calories != null ? (
-                      <span className="text-gray-600"> · {p.calories} cal</span>
+                      <span className="text-gray-600"> 🔥 {p.calories} cal</span>
                     ) : null}
                   </span>
                   <button
@@ -282,7 +278,7 @@ export default function NewFoodPage() {
                     onClick={() => handleDeletePreset(p.id)}
                     className="shrink-0 text-xs text-red-600 underline"
                   >
-                    Remove
+                    🧹 Remove
                   </button>
                 </li>
               ))}
