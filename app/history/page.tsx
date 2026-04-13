@@ -1,3 +1,4 @@
+import { fetchPrimaryDog } from "@/lib/primary-dog";
 import { supabase } from "@/lib/supabase";
 import HistoryList from "./HistoryList";
 
@@ -46,8 +47,8 @@ type HistoryItem =
   | { id: string; type: "training"; timestamp: string; data: TrainingEntry };
 
 export default async function HistoryPage() {
-  const { data: dogs } = await supabase.from("dogs").select("*").limit(1);
-  const olive = dogs?.[0];
+  const dogResult = await fetchPrimaryDog();
+  const olive = dogResult.ok ? dogResult.dog : null;
 
   const { data: foodEntries, error: foodError } = olive
     ? await supabase
@@ -117,7 +118,9 @@ export default async function HistoryPage() {
   return (
     <main className="min-h-screen p-6">
       <div className="mx-auto max-w-md">
-        {foodError || walkError || eventError || trainingError ? (
+        {!dogResult.ok ? (
+          <p className="text-sm text-red-600">{dogResult.errorMessage}</p>
+        ) : foodError || walkError || eventError || trainingError ? (
           <p className="text-sm text-red-600">Could not load history.</p>
         ) : (
           <HistoryList

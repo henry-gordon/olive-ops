@@ -1,13 +1,10 @@
 import Link from "next/link";
+import { fetchPrimaryDog } from "@/lib/primary-dog";
 import { supabase } from "@/lib/supabase";
 
 export default async function HomePage() {
-  const { data: dogs, error: dogError } = await supabase
-    .from("dogs")
-    .select("*")
-    .limit(1);
-
-  const olive = dogs?.[0];
+  const dogResult = await fetchPrimaryDog();
+  const olive = dogResult.ok ? dogResult.dog : null;
 
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
@@ -71,11 +68,11 @@ export default async function HomePage() {
 
         <section className="rounded-2xl border p-4 space-y-2">
           <h2 className="text-lg font-semibold">
-            {olive ? `${olive.name} Summary` : "Dog Summary"}
+            {olive ? `${olive.name ?? "Dog"} Summary` : "Dog Summary"}
           </h2>
 
-          {dogError ? (
-            <p className="text-sm text-red-600">Could not load dog data.</p>
+          {!dogResult.ok ? (
+            <p className="text-sm text-red-600">{dogResult.errorMessage}</p>
           ) : (
             <>
               <p className="text-sm text-gray-600">
@@ -106,6 +103,12 @@ export default async function HomePage() {
         </section>
 
         <section className="grid grid-cols-2 gap-3">
+          <Link
+            href="/walks/mode"
+            className="col-span-2 rounded-2xl border-2 border-emerald-600 bg-emerald-50 py-4 text-center text-base font-semibold text-emerald-900"
+          >
+            Walk Mode (GPS)
+          </Link>
           <Link href="/food/new" className="rounded-2xl border p-4 font-medium">
             Add Food
           </Link>

@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { usePrimaryDog } from "@/lib/use-primary-dog";
 
 export default function NewEventPage() {
+  const { dog, loading: dogLoading, errorMessage: dogError } = usePrimaryDog();
   const [eventType, setEventType] = useState("daycare");
   const [title, setTitle] = useState("");
   const [startsAt, setStartsAt] = useState("");
@@ -36,11 +38,16 @@ export default function NewEventPage() {
       }
     }
 
+    if (!dog) {
+      setMessage(dogError ?? "Dog not loaded yet.");
+      return;
+    }
+
     setMessage("Saving...");
 
     const { error } = await supabase.from("events").insert({
-      household_id: "fb2d14e0-289c-4e24-9998-9d7f9928fc03",
-      dog_id: "ca061b23-5812-4900-bb29-1b5dd444c313",
+      household_id: dog.household_id,
+      dog_id: dog.id,
       event_type: eventType,
       title: title.trim(),
       starts_at: startsAt,
@@ -64,10 +71,21 @@ export default function NewEventPage() {
     setMessage("Event saved.");
   }
 
+  const formDisabled = dogLoading || !dog;
+
   return (
     <main className="min-h-screen p-6">
       <div className="mx-auto max-w-md space-y-6">
         <h1 className="text-3xl font-bold">Add Event</h1>
+
+        {dogLoading ? (
+          <p className="text-sm text-gray-600">Loading dog…</p>
+        ) : dogError || !dog ? (
+          <p className="text-sm text-red-600">
+            {dogError ?? "Could not load dog."}
+          </p>
+        ) : null}
+
         <p className="text-sm text-gray-600">
           Log daycare, training, vet visits, and other scheduled events.
         </p>
@@ -144,7 +162,8 @@ export default function NewEventPage() {
 
           <button
             type="submit"
-            className="w-full rounded-xl border p-3 font-medium"
+            disabled={formDisabled}
+            className="w-full rounded-xl border p-3 font-medium disabled:cursor-not-allowed disabled:opacity-50"
           >
             Save Event
           </button>

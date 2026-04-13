@@ -1,9 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { usePrimaryDog } from "@/lib/use-primary-dog";
 
 export default function NewWalkPage() {
+  const { dog, loading: dogLoading, errorMessage: dogError } = usePrimaryDog();
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [durationMinutes, setDurationMinutes] = useState("");
@@ -44,11 +47,16 @@ export default function NewWalkPage() {
       finalDuration = diffMinutes;
     }
 
+    if (!dog) {
+      setMessage(dogError ?? "Dog not loaded yet.");
+      return;
+    }
+
     setMessage("Saving...");
 
     const { error } = await supabase.from("walks").insert({
-      household_id: "PASTE_HOUSEHOLD_ID_HERE",
-      dog_id: "PASTE_DOG_ID_HERE",
+      household_id: dog.household_id,
+      dog_id: dog.id,
       start_time: startTime,
       end_time: endTime || null,
       duration_minutes: finalDuration,
@@ -72,15 +80,30 @@ export default function NewWalkPage() {
     setMessage("Walk saved.");
   }
 
+  const formDisabled = dogLoading || !dog;
+
   return (
     <main className="min-h-screen p-6">
       <div className="mx-auto max-w-md space-y-6">
         <h1 className="text-3xl font-bold">Add Walk</h1>
+
+        {dogLoading ? (
+          <p className="text-sm text-gray-600">Loading dog…</p>
+        ) : dogError || !dog ? (
+          <p className="text-sm text-red-600">
+            {dogError ?? "Could not load dog."}
+          </p>
+        ) : null}
+
         <p className="text-sm text-gray-600">
-          Log a start time, plus either an end time or a duration.
+          Log a start time, plus either an end time or a duration. On your phone,{" "}
+          <Link href="/walks/mode" className="font-medium text-emerald-700 underline">
+            Walk Mode
+          </Link>{" "}
+          tracks time, distance, and reactions live.
         </p>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4" aria-busy={formDisabled}>
           <div className="space-y-1">
             <label className="block text-sm font-medium">Start Time</label>
             <input
@@ -153,7 +176,8 @@ export default function NewWalkPage() {
 
           <button
             type="submit"
-            className="w-full rounded-xl border p-3 font-medium"
+            disabled={formDisabled}
+            className="w-full rounded-xl border p-3 font-medium disabled:cursor-not-allowed disabled:opacity-50"
           >
             Save Walk
           </button>

@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { usePrimaryDog } from "@/lib/use-primary-dog";
 
 export default function NewTrainingPage() {
+  const { dog, loading: dogLoading, errorMessage: dogError } = usePrimaryDog();
   const [skillName, setSkillName] = useState("");
   const [sessionAt, setSessionAt] = useState("");
   const [durationMinutes, setDurationMinutes] = useState("");
@@ -25,11 +27,16 @@ export default function NewTrainingPage() {
       return;
     }
 
+    if (!dog) {
+      setMessage(dogError ?? "Dog not loaded yet.");
+      return;
+    }
+
     setMessage("Saving...");
 
     const { error } = await supabase.from("training_sessions").insert({
-      household_id: "fb2d14e0-289c-4e24-9998-9d7f9928fc03",
-      dog_id: "ca061b23-5812-4900-bb29-1b5dd444c313",
+      household_id: dog.household_id,
+      dog_id: dog.id,
       skill_name: skillName.trim(),
       session_at: sessionAt,
       duration_minutes: durationMinutes ? Number(durationMinutes) : null,
@@ -51,10 +58,21 @@ export default function NewTrainingPage() {
     setMessage("Training session saved.");
   }
 
+  const formDisabled = dogLoading || !dog;
+
   return (
     <main className="min-h-screen p-6">
       <div className="mx-auto max-w-md space-y-6">
         <h1 className="text-3xl font-bold">Add Training</h1>
+
+        {dogLoading ? (
+          <p className="text-sm text-gray-600">Loading dog…</p>
+        ) : dogError || !dog ? (
+          <p className="text-sm text-red-600">
+            {dogError ?? "Could not load dog."}
+          </p>
+        ) : null}
+
         <p className="text-sm text-gray-600">
           Log what you worked on and how it went.
         </p>
@@ -122,7 +140,8 @@ export default function NewTrainingPage() {
 
           <button
             type="submit"
-            className="w-full rounded-xl border p-3 font-medium"
+            disabled={formDisabled}
+            className="w-full rounded-xl border p-3 font-medium disabled:cursor-not-allowed disabled:opacity-50"
           >
             Save Training Session
           </button>

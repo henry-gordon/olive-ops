@@ -1,0 +1,19 @@
+model = "gpt-5.4"
+
+developer_instructions = """
+This is Olive Ops, a mobile-first shared dog tracking app.
+
+Stack:
+- Next.js App Router
+- TypeScript
+- Supabase
+- Tailwind CSS
+
+Working style:
+- Keep code simple and readable.
+- Prefer small incremental changes over rewrites.
+- Preserve current route structure.
+- Reuse existing patterns from food, walks, events, training, and history pages.
+- When adding a field, consider database schema, form save logic, Today page, and History page.
+- Avoid touching unrelated files.
+"""
