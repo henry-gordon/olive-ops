@@ -64,6 +64,10 @@ type DraftTreat = {
   type: TreatType;
 };
 
+type EditTreatDraft = DraftTreat & {
+  score: string;
+};
+
 type RankingSession = {
   treat: Treat;
   opponents: Treat[];
@@ -308,6 +312,8 @@ function TreatRankingApp({ pet }: { pet: PrimaryPetRow }) {
     emptyDraft("frozen"),
   ]);
   const [newTreat, setNewTreat] = useState<DraftTreat>(emptyDraft());
+  const [editingTreatId, setEditingTreatId] = useState<string | null>(null);
+  const [editTreat, setEditTreat] = useState<EditTreatDraft | null>(null);
   const [session, setSession] = useState<RankingSession | null>(null);
 
   useEffect(() => {
@@ -429,6 +435,75 @@ function TreatRankingApp({ pet }: { pet: PrimaryPetRow }) {
       workingTreats: treats,
     });
     setNewTreat(emptyDraft(newTreat.type));
+  }
+
+  function startEditingTreat(treat: Treat) {
+    setMessage("");
+    setEditingTreatId(treat.id);
+    setEditTreat({
+      name: treat.name,
+      brand: treat.brand,
+      type: treat.type,
+      score: String(treat.score),
+    });
+  }
+
+  function cancelEditingTreat() {
+    setEditingTreatId(null);
+    setEditTreat(null);
+  }
+
+  async function saveEditedTreat(treatId: string) {
+    if (!editTreat) return;
+
+    const name = editTreat.name.trim();
+    if (!name) {
+      setMessage("Treat name is required.");
+      return;
+    }
+
+    const duplicate = treats.some(
+      (treat) =>
+        treat.id !== treatId &&
+        treat.name.trim().toLowerCase() === name.toLowerCase()
+    );
+    if (duplicate) {
+      setMessage("That treat is already on the board.");
+      return;
+    }
+
+    const score = Number(editTreat.score);
+    if (!Number.isFinite(score)) {
+      setMessage("Score needs to be a number from 0 to 100.");
+      return;
+    }
+
+    const updatedTreats = rankTreats(
+      treats.map((treat) =>
+        treat.id === treatId
+          ? {
+              ...treat,
+              name,
+              brand: editTreat.brand.trim(),
+              type: editTreat.type,
+              score: clampTreatScore(score),
+            }
+          : treat
+      )
+    );
+
+    setIsSaving(true);
+    const saveResult = await saveTreats(pet, updatedTreats);
+    setIsSaving(false);
+
+    if (!saveResult.ok) {
+      setMessage(`Could not save treat edits: ${saveResult.errorMessage}`);
+      return;
+    }
+
+    setTreats(updatedTreats);
+    cancelEditingTreat();
+    setMessage(`${name} updated.`);
   }
 
   async function answerComparison(winnerId: string) {
