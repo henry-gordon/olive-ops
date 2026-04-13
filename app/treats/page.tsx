@@ -428,6 +428,7 @@ function TreatRankingApp({ pet }: { pet: PrimaryPetRow }) {
     }
 
     const treat = createTreat(newTreat, NEW_TREAT_SCORE);
+    cancelEditingTreat();
     setSession({
       treat,
       opponents: comparisonCandidates(treats),
@@ -469,6 +470,11 @@ function TreatRankingApp({ pet }: { pet: PrimaryPetRow }) {
     );
     if (duplicate) {
       setMessage("That treat is already on the board.");
+      return;
+    }
+
+    if (!editTreat.score.trim()) {
+      setMessage("Score needs to be a number from 0 to 100.");
       return;
     }
 
@@ -743,46 +749,158 @@ function TreatRankingApp({ pet }: { pet: PrimaryPetRow }) {
                 <ol className="space-y-3">
                   {filteredTreats.map((treat, index) => (
                     <li key={treat.id} className="rounded-lg border p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-medium text-gray-500">
-                            #{filter === "all" ? index + 1 : rankedTreats.findIndex((item) => item.id === treat.id) + 1}
-                          </p>
-                          <h3 className="text-lg font-semibold">
-                            {treatTypeEmoji[treat.type]} {treat.name}
-                          </h3>
-                          <p className="text-sm text-gray-600">
-                            {treat.brand ? `${treat.brand} - ` : ""}
-                            {treat.type[0].toUpperCase() + treat.type.slice(1)}
-                          </p>
+                      {editingTreatId === treat.id && editTreat ? (
+                        <form
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            saveEditedTreat(treat.id);
+                          }}
+                          className="space-y-3"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-medium text-gray-500">
+                                Editing #{rankedTreats.findIndex((item) => item.id === treat.id) + 1}
+                              </p>
+                              <h3 className="text-lg font-semibold">
+                                {treatTypeEmoji[editTreat.type]} {editTreat.name || "Treat"}
+                              </h3>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={cancelEditingTreat}
+                              className="rounded-lg border px-3 py-2 text-sm"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="block text-sm font-medium">Treat name</label>
+                            <input
+                              value={editTreat.name}
+                              onChange={(e) =>
+                                setEditTreat((current) =>
+                                  current ? { ...current, name: e.target.value } : current
+                                )
+                              }
+                              className="w-full rounded-lg border p-3"
+                              required
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div className="space-y-1">
+                              <label className="block text-sm font-medium">Type</label>
+                              <select
+                                value={editTreat.type}
+                                onChange={(e) =>
+                                  setEditTreat((current) =>
+                                    current
+                                      ? { ...current, type: e.target.value as TreatType }
+                                      : current
+                                  )
+                                }
+                                className="w-full rounded-lg border p-3"
+                              >
+                                {treatTypes.map((type) => (
+                                  <option key={type} value={type}>
+                                    {type[0].toUpperCase() + type.slice(1)}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="space-y-1">
+                              <label className="block text-sm font-medium">Score</label>
+                              <input
+                                value={editTreat.score}
+                                onChange={(e) =>
+                                  setEditTreat((current) =>
+                                    current ? { ...current, score: e.target.value } : current
+                                  )
+                                }
+                                className="w-full rounded-lg border p-3"
+                                inputMode="numeric"
+                                min="0"
+                                max="100"
+                                required
+                                type="number"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="block text-sm font-medium">Brand</label>
+                            <input
+                              value={editTreat.brand}
+                              onChange={(e) =>
+                                setEditTreat((current) =>
+                                  current ? { ...current, brand: e.target.value } : current
+                                )
+                              }
+                              className="w-full rounded-lg border p-3"
+                              placeholder="Optional"
+                            />
+                          </div>
+
+                          <button
+                            type="submit"
+                            disabled={isSaving}
+                            className="w-full rounded-lg border p-3 font-medium disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {isSaving ? "Saving..." : "Save Changes"}
+                          </button>
+                        </form>
+                      ) : (
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-medium text-gray-500">
+                              #{filter === "all" ? index + 1 : rankedTreats.findIndex((item) => item.id === treat.id) + 1}
+                            </p>
+                            <h3 className="text-lg font-semibold">
+                              {treatTypeEmoji[treat.type]} {treat.name}
+                            </h3>
+                            <p className="text-sm text-gray-600">
+                              {treat.brand ? `${treat.brand} - ` : ""}
+                              {treat.type[0].toUpperCase() + treat.type.slice(1)}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => startEditingTreat(treat)}
+                              disabled={isSaving || session !== null}
+                              className="mt-3 rounded-lg border px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              Edit
+                            </button>
+                          </div>
+                          <div className="min-w-24 text-right">
+                            {(() => {
+                              const mood = getScoreMood(treat.score);
+                              return (
+                                <>
+                                  <p
+                                    className={`inline-flex items-center rounded-full border px-2 py-1 font-mono text-lg font-semibold ${mood.className}`}
+                                  >
+                                    {mood.emoji} {treat.score}/100
+                                  </p>
+                                  <div className="mt-2 h-2 w-full rounded-full bg-gray-100">
+                                    <div
+                                      className={`h-2 rounded-full ${mood.barClassName}`}
+                                      style={{ width: `${treat.score}%` }}
+                                    />
+                                  </div>
+                                  <p className="mt-1 text-xs font-medium text-gray-500">
+                                    {mood.label}
+                                  </p>
+                                </>
+                              );
+                            })()}
+                            <p className="text-xs text-gray-500">
+                              {treat.wins}-{treat.losses}
+                            </p>
+                          </div>
                         </div>
-                        <div className="min-w-24 text-right">
-                          {(() => {
-                            const mood = getScoreMood(treat.score);
-                            return (
-                              <>
-                                <p
-                                  className={`inline-flex items-center rounded-full border px-2 py-1 font-mono text-lg font-semibold ${mood.className}`}
-                                >
-                                  {mood.emoji} {treat.score}/100
-                                </p>
-                                <div className="mt-2 h-2 w-full rounded-full bg-gray-100">
-                                  <div
-                                    className={`h-2 rounded-full ${mood.barClassName}`}
-                                    style={{ width: `${treat.score}%` }}
-                                  />
-                                </div>
-                                <p className="mt-1 text-xs font-medium text-gray-500">
-                                  {mood.label}
-                                </p>
-                              </>
-                            );
-                          })()}
-                          <p className="text-xs text-gray-500">
-                            {treat.wins}-{treat.losses}
-                          </p>
-                        </div>
-                      </div>
+                      )}
                     </li>
                   ))}
                 </ol>
