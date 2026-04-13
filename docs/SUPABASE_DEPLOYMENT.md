@@ -75,6 +75,7 @@ created_at timestamptz not null default now()
 
 Each activity table should have `household_id` and `pet_id`:
 
+- `food_types`: `name`, `unit`, `calories_per_unit`, `created_by`, `created_at`, `updated_at`
 - `food_entries`: `food_name`, `calories`, `amount`, `notes`, `fed_at`, `created_by`
 - `walks`: `start_time`, `end_time`, `duration_minutes`, `location_note`, `reactivity_level`, `notes`, `created_by`
 - `events`: `event_type`, `title`, `starts_at`, `ends_at`, `location`, `notes`, `created_by`
@@ -129,11 +130,12 @@ After deploying:
 
 1. Open the Vercel preview URL on your phone.
 2. Confirm the home page loads Olive's summary.
-3. Add a food entry.
-4. Add a manual walk.
-5. Start and save a Walk Mode session. GPS requires HTTPS, which Vercel provides.
-6. Add an event.
-7. Add a training session.
-8. Open `/history` and confirm the new rows appear.
-9. Open Supabase Table Editor and confirm rows were written with `pet_id`.
-10. Open `/treats` on a second device and confirm the shared treat rankings load from Supabase.
+3. Add a food type on `/food/new`, then open the same page on a second device and confirm the shared food type appears.
+4. Add a food entry.
+5. Add a manual walk.
+6. Start and save a Walk Mode session. GPS requires HTTPS, which Vercel provides.
+7. Add an event.
+8. Add a training session.
+9. Open `/history` and confirm the new rows appear.
+10. Open Supabase Table Editor and confirm rows were written with `pet_id`.
+11. Open `/treats` on a second device and confirm the shared treat rankings load from Supabase.

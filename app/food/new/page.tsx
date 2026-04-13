@@ -122,7 +122,7 @@ function formatNumber(value: number) {
 export default function NewFoodPage() {
   const { pet, loading: petLoading, errorMessage: petError } = usePrimaryPet();
   const [foodTypes, setFoodTypes] = useState<FoodType[]>(loadFoodTypes);
-  const [loadingFoodTypes, setLoadingFoodTypes] = useState(true);
+  const [loadingFoodTypes, setLoadingFoodTypes] = useState(false);
   const [showFoodTypeForm, setShowFoodTypeForm] = useState(false);
   const [selectedFoodTypeId, setSelectedFoodTypeId] = useState("");
   const [quantity, setQuantity] = useState("");
@@ -146,20 +146,18 @@ export default function NewFoodPage() {
 
   useEffect(() => {
     if (petLoading) return;
-    if (!pet) {
-      setLoadingFoodTypes(false);
-      return;
-    }
+    if (!pet) return;
 
     let cancelled = false;
+    const activePet = pet;
 
     async function loadSharedFoodTypes() {
       setLoadingFoodTypes(true);
       const { data, error } = await supabase
         .from("food_types")
         .select("id, name, unit, calories_per_unit")
-        .eq("household_id", pet.household_id)
-        .eq("pet_id", pet.id)
+        .eq("household_id", activePet.household_id)
+        .eq("pet_id", activePet.id)
         .order("name", { ascending: true });
 
       if (cancelled) return;
@@ -192,8 +190,8 @@ export default function NewFoodPage() {
         .from("food_types")
         .insert(
           localFoodTypes.map((foodType) => ({
-            household_id: pet.household_id,
-            pet_id: pet.id,
+            household_id: activePet.household_id,
+            pet_id: activePet.id,
             name: foodType.name,
             unit: foodType.unit,
             calories_per_unit: foodType.caloriesPerUnit,

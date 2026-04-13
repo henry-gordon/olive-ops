@@ -83,12 +83,15 @@ Tables used by the app:
 - `households`: `id`, `name`, `created_at`
 - `pets`: `id`, `household_id`, `name`, `species`, `adoption_date`, `birth_estimate`, `notes`, `created_at`
 - `household_members`: `id`, `household_id`, `user_id`, `display_name`, `email`, `role`, `created_at`
+- `food_types`: `household_id`, `pet_id`, `name`, `unit`, `calories_per_unit`, `created_by`
 - `food_entries`: `household_id`, `pet_id`, `food_name`, `calories`, `amount`, `notes`, `fed_at`, `created_by`
 - `walks`: `household_id`, `pet_id`, `start_time`, `end_time`, `duration_minutes`, `location_note`, `reactivity_level`, `notes`, `created_by`
 - `events`: `household_id`, `pet_id`, `event_type`, `title`, `starts_at`, `ends_at`, `location`, `notes`, `created_by`
 - `training_sessions`: `household_id`, `pet_id`, `skill_name`, `session_at`, `duration_minutes`, `success_rating`, `notes`, `created_by`
 
 There is a legacy `dogs` table and legacy `dog_id` columns from the first app iteration. New app code should use `pets` and `pet_id`. Do not add new dog-centric app concepts unless the product intentionally introduces species-specific behavior.
+
+Food types use the `food_types` table so the household sees the same saved foods across devices. Existing device-local food types are migrated into Supabase the first time `/food/new` loads for a pet with no shared food types yet.
 
 Treat rankings use the `treat_rankings` table with a 0-100 preference score. Existing device-local rankings are migrated into Supabase the first time `/treats` loads for a pet with no shared board yet.
 
