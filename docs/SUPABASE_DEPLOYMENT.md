@@ -79,6 +79,7 @@ Each activity table should have `household_id` and `pet_id`:
 - `walks`: `start_time`, `end_time`, `duration_minutes`, `location_note`, `reactivity_level`, `notes`, `created_by`
 - `events`: `event_type`, `title`, `starts_at`, `ends_at`, `location`, `notes`, `created_by`
 - `training_sessions`: `skill_name`, `session_at`, `duration_minutes`, `success_rating`, `notes`, `created_by`
+- `treat_rankings`: `name`, `brand`, `type`, `score`, `wins`, `losses`, `created_at`, `updated_at`
 
 Legacy `dog_id` columns may still exist from the first iteration, but new app code should use `pet_id`.
 
@@ -135,4 +136,4 @@ After deploying:
 7. Add a training session.
 8. Open `/history` and confirm the new rows appear.
 9. Open Supabase Table Editor and confirm rows were written with `pet_id`.
-10. Open `/treats` on a second device and remember that rankings will not sync yet because they are stored in browser `localStorage`.
+10. Open `/treats` on a second device and confirm the shared treat rankings load from Supabase.

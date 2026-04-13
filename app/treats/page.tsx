@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { PrimaryPetRow } from "@/lib/primary-pet";
+import { supabase } from "@/lib/supabase";
 import { usePrimaryPet } from "@/lib/use-primary-pet";
 
 const STORAGE_PREFIX = "olive-ops-treat-rankings";
@@ -30,6 +31,19 @@ type Treat = {
   createdAt: string;
 };
 
+type TreatRow = {
+  id: string;
+  household_id: string;
+  pet_id: string;
+  name: string;
+  brand: string | null;
+  type: string;
+  score: number;
+  wins: number;
+  losses: number;
+  created_at: string;
+};
+
 type DraftTreat = {
   name: string;
   brand: string;
@@ -51,7 +65,7 @@ function isTreatType(value: unknown): value is TreatType {
   return typeof value === "string" && treatTypes.includes(value as TreatType);
 }
 
-function readTreats(petId: string): Treat[] {
+function readLocalTreats(petId: string): Treat[] {
   if (typeof window === "undefined") return [];
 
   try {
@@ -77,10 +91,6 @@ function readTreats(petId: string): Treat[] {
   } catch {
     return [];
   }
-}
-
-function writeTreats(petId: string, treats: Treat[]) {
-  localStorage.setItem(getStorageKey(petId), JSON.stringify(treats));
 }
 
 function rankTreats(treats: Treat[]) {
@@ -137,6 +147,62 @@ function comparisonCandidates(treats: Treat[]) {
   return [...indexes].map((index) => ranked[index]).filter(Boolean);
 }
 
+function rowToTreat(row: TreatRow): Treat | null {
+  if (!isTreatType(row.type)) return null;
+  return {
+    id: row.id,
+    name: row.name,
+    brand: row.brand ?? "",
+    type: row.type,
+    score: row.score,
+    wins: row.wins,
+    losses: row.losses,
+    createdAt: row.created_at,
+  };
+}
+
+function treatToRow(pet: PrimaryPetRow, treat: Treat) {
+  return {
+    id: treat.id,
+    household_id: pet.household_id,
+    pet_id: pet.id,
+    name: treat.name,
+    brand: treat.brand,
+    type: treat.type,
+    score: treat.score,
+    wins: treat.wins,
+    losses: treat.losses,
+    created_at: treat.createdAt,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+async function fetchTreats(pet: PrimaryPetRow) {
+  const { data, error } = await supabase
+    .from("treat_rankings")
+    .select("id, household_id, pet_id, name, brand, type, score, wins, losses, created_at")
+    .eq("pet_id", pet.id)
+    .order("score", { ascending: false })
+    .order("created_at", { ascending: true });
+
+  if (error) return { ok: false as const, errorMessage: error.message };
+
+  const treats = ((data ?? []) as TreatRow[])
+    .map(rowToTreat)
+    .filter((treat): treat is Treat => treat !== null);
+
+  return { ok: true as const, treats: rankTreats(treats) };
+}
+
+async function saveTreats(pet: PrimaryPetRow, treats: Treat[]) {
+  const { error } = await supabase
+    .from("treat_rankings")
+    .upsert(treats.map((treat) => treatToRow(pet, treat)));
+
+  if (error) return { ok: false as const, errorMessage: error.message };
+  return { ok: true as const };
+}
+
 function emptyDraft(type: TreatType = "soft"): DraftTreat {
   return { name: "", brand: "", type };
 }
@@ -168,7 +234,9 @@ export default function TreatsPage() {
 }
 
 function TreatRankingApp({ pet }: { pet: PrimaryPetRow }) {
-  const [treats, setTreats] = useState<Treat[]>(() => readTreats(pet.id));
+  const [treats, setTreats] = useState<Treat[]>([]);
+  const [loadingTreats, setLoadingTreats] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [filter, setFilter] = useState<FilterType>("all");
   const [message, setMessage] = useState("");
   const [bootstrapDrafts, setBootstrapDrafts] = useState<DraftTreat[]>([
@@ -182,8 +250,48 @@ function TreatRankingApp({ pet }: { pet: PrimaryPetRow }) {
   const [session, setSession] = useState<RankingSession | null>(null);
 
   useEffect(() => {
-    writeTreats(pet.id, treats);
-  }, [pet.id, treats]);
+    let cancelled = false;
+
+    (async () => {
+      setLoadingTreats(true);
+      const result = await fetchTreats(pet);
+      if (cancelled) return;
+
+      if (!result.ok) {
+        setTreats([]);
+        setMessage(`Could not load treat rankings: ${result.errorMessage}`);
+        setLoadingTreats(false);
+        return;
+      }
+
+      if (result.treats.length > 0) {
+        setTreats(result.treats);
+        setLoadingTreats(false);
+        return;
+      }
+
+      const localTreats = rankTreats(readLocalTreats(pet.id));
+      if (localTreats.length > 0) {
+        const saveResult = await saveTreats(pet, localTreats);
+        if (cancelled) return;
+        if (saveResult.ok) {
+          setTreats(localTreats);
+          setMessage("Synced this device's treat board so it can load on other devices.");
+        } else {
+          setTreats(localTreats);
+          setMessage(`Could not sync local treat board: ${saveResult.errorMessage}`);
+        }
+      } else {
+        setTreats([]);
+      }
+
+      setLoadingTreats(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pet]);
 
   const rankedTreats = useMemo(() => rankTreats(treats), [treats]);
   const filteredTreats = useMemo(() => {
@@ -202,8 +310,9 @@ function TreatRankingApp({ pet }: { pet: PrimaryPetRow }) {
     );
   }
 
-  function handleBootstrapSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleBootstrapSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    setMessage("");
     const filledDrafts = bootstrapDrafts.filter((draft) => draft.name.trim());
 
     if (filledDrafts.length < 3) {
@@ -222,7 +331,16 @@ function TreatRankingApp({ pet }: { pet: PrimaryPetRow }) {
       createTreat(draft, startingScore - index * 90)
     );
 
-    setTreats(seededTreats);
+    setIsSaving(true);
+    const saveResult = await saveTreats(pet, seededTreats);
+    setIsSaving(false);
+
+    if (!saveResult.ok) {
+      setMessage(`Could not save starting board: ${saveResult.errorMessage}`);
+      return;
+    }
+
+    setTreats(rankTreats(seededTreats));
     setMessage("Starting board saved. Add the next treat when Olive finds a new obsession.");
   }
 
@@ -253,7 +371,7 @@ function TreatRankingApp({ pet }: { pet: PrimaryPetRow }) {
     setNewTreat(emptyDraft(newTreat.type));
   }
 
-  function answerComparison(winnerId: string) {
+  async function answerComparison(winnerId: string) {
     if (!session || !activeOpponent) return;
 
     const newTreatWon = winnerId === session.treat.id;
@@ -269,7 +387,17 @@ function TreatRankingApp({ pet }: { pet: PrimaryPetRow }) {
     const nextIndex = session.index + 1;
 
     if (nextIndex >= session.opponents.length) {
-      setTreats(rankTreats([...nextWorkingTreats, updatedNewTreat]));
+      const nextTreats = rankTreats([...nextWorkingTreats, updatedNewTreat]);
+      setIsSaving(true);
+      const saveResult = await saveTreats(pet, nextTreats);
+      setIsSaving(false);
+
+      if (!saveResult.ok) {
+        setMessage(`Could not save ranking: ${saveResult.errorMessage}`);
+        return;
+      }
+
+      setTreats(nextTreats);
       setSession(null);
       setMessage(`${updatedNewTreat.name} landed on the board.`);
       return;
@@ -294,7 +422,14 @@ function TreatRankingApp({ pet }: { pet: PrimaryPetRow }) {
           </p>
         </header>
 
-        {!hasFinishedBootstrap ? (
+        {loadingTreats ? (
+          <section className="space-y-2 rounded-lg border border-gray-200 p-4 dark:border-zinc-800 dark:bg-zinc-900">
+            <h2 className="text-lg font-semibold">Loading treat rankings</h2>
+            <p className="text-sm text-gray-600">
+              Checking the shared board for {pet.name ?? "your pet"}.
+            </p>
+          </section>
+        ) : !hasFinishedBootstrap ? (
           <section className="space-y-4 rounded-lg border border-gray-200 p-4 dark:border-zinc-800 dark:bg-zinc-900">
             <div className="space-y-1">
               <h2 className="text-lg font-semibold">Start with the favorites</h2>
@@ -340,8 +475,12 @@ function TreatRankingApp({ pet }: { pet: PrimaryPetRow }) {
                 </div>
               ))}
 
-              <button type="submit" className="w-full rounded-lg border p-3 font-medium">
-                Save Starting Board
+              <button
+                type="submit"
+                disabled={isSaving}
+                className="w-full rounded-lg border p-3 font-medium disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isSaving ? "Saving..." : "Save Starting Board"}
               </button>
             </form>
           </section>
@@ -362,7 +501,8 @@ function TreatRankingApp({ pet }: { pet: PrimaryPetRow }) {
                   <button
                     type="button"
                     onClick={() => answerComparison(session.treat.id)}
-                    className="rounded-lg border p-4 text-left font-medium"
+                    disabled={isSaving}
+                    className="rounded-lg border p-4 text-left font-medium disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {session.treat.name}
                     {session.treat.brand ? (
@@ -374,7 +514,8 @@ function TreatRankingApp({ pet }: { pet: PrimaryPetRow }) {
                   <button
                     type="button"
                     onClick={() => answerComparison(activeOpponent.id)}
-                    className="rounded-lg border p-4 text-left font-medium"
+                    disabled={isSaving}
+                    className="rounded-lg border p-4 text-left font-medium disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {activeOpponent.name}
                     {activeOpponent.brand ? (

@@ -27,7 +27,7 @@ The project is intentionally practical. It is a household workflow first and a l
 - Event logging at `/events/new` for daycare, training, vet, grooming, playdates, and other schedule items.
 - Training logging at `/training/new`.
 - Recent history at `/history`, with filters across food, walks, events, and training.
-- Treat Rankings at `/treats`, currently stored in `localStorage` per pet rather than Supabase.
+- Treat Rankings at `/treats`, stored in Supabase per pet so the household sees the same board across devices.
 
 ## Product Principles
 
@@ -90,7 +90,7 @@ Tables used by the app:
 
 There is a legacy `dogs` table and legacy `dog_id` columns from the first app iteration. New app code should use `pets` and `pet_id`. Do not add new dog-centric app concepts unless the product intentionally introduces species-specific behavior.
 
-Treat rankings are not in Supabase yet. They use browser `localStorage`, which is useful for a quick experiment but will not sync between partners or devices.
+Treat rankings use the `treat_rankings` table. Existing device-local rankings are migrated into Supabase the first time `/treats` loads for a pet with no shared board yet.
 
 ## Vercel Readiness
 
@@ -117,6 +117,5 @@ See [docs/SUPABASE_DEPLOYMENT.md](./docs/SUPABASE_DEPLOYMENT.md) for the step-by
 
 - Add a committed schema/migration file so the Supabase structure is reproducible.
 - Replace hardcoded `created_by` values with a household member selector or authentication.
-- Move Treat Rankings from `localStorage` into Supabase once it needs shared, cross-device behavior.
 - Add household-scoped Supabase Auth policies before making the app public.
 - Add focused tests around data mapping and form validation as the workflows stabilize.

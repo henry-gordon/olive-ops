@@ -24,7 +24,7 @@ Implementation preferences:
 - Treat `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` as the only required local env vars for the current app.
 - Use `pets` and `pet_id` as the canonical app model. `Olive` is a pet with `species = 'dog'`.
 - The legacy `dogs` table and legacy `dog_id` columns may still exist for compatibility. Do not build new app behavior on them.
-- Remember that `/treats` currently uses `localStorage`, not Supabase, so it is device-local by design.
+- Remember that `/treats` uses Supabase `treat_rankings` rows for cross-device sync. It may read old `localStorage` data once to migrate a device-local board if Supabase is empty for that pet.
 - The current app assumes the first row in `pets` is the primary pet. If multi-pet selection is added, change `lib/primary-pet.ts` intentionally and update the docs.
 
 Deployment notes:

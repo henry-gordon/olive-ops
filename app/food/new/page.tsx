@@ -1,127 +1,206 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { usePrimaryPet } from "@/lib/use-primary-pet";
 
-const PRESETS_STORAGE_KEY = "olive-ops-food-presets";
+const FOOD_TYPES_STORAGE_KEY = "olive-ops-food-types";
+const LEGACY_PRESETS_STORAGE_KEY = "olive-ops-food-presets";
 
-type FoodPreset = {
+type FoodType = {
   id: string;
   name: string;
-  amount: string;
-  calories: number | null;
+  unit: string;
+  caloriesPerUnit: number;
 };
 
-function loadPresets(): FoodPreset[] {
+type LegacyFoodPreset = {
+  id: string;
+  name: string;
+  amount?: string;
+  calories?: number | null;
+};
+
+function isFoodType(value: unknown): value is FoodType {
+  const foodType = value as FoodType;
+  return (
+    typeof foodType?.id === "string" &&
+    typeof foodType.name === "string" &&
+    typeof foodType.unit === "string" &&
+    typeof foodType.caloriesPerUnit === "number" &&
+    Number.isFinite(foodType.caloriesPerUnit)
+  );
+}
+
+function loadFoodTypes(): FoodType[] {
   if (typeof window === "undefined") return [];
+
   try {
-    const raw = localStorage.getItem(PRESETS_STORAGE_KEY);
+    const raw = localStorage.getItem(FOOD_TYPES_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as unknown;
+      if (Array.isArray(parsed)) {
+        return parsed.filter(isFoodType);
+      }
+    }
+  } catch {
+    return [];
+  }
+
+  return loadLegacyPresets();
+}
+
+function loadLegacyPresets(): FoodType[] {
+  try {
+    const raw = localStorage.getItem(LEGACY_PRESETS_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
+
     return parsed
-      .filter(
-        (p): p is FoodPreset =>
-          typeof p === "object" &&
-          p !== null &&
-          typeof (p as FoodPreset).id === "string" &&
-          typeof (p as FoodPreset).name === "string"
-      )
-      .map((p) => ({
-        id: p.id,
-        name: p.name,
-        amount: typeof p.amount === "string" ? p.amount : "",
-        calories:
-          typeof p.calories === "number" && !Number.isNaN(p.calories)
-            ? p.calories
-            : null,
+      .filter((item): item is LegacyFoodPreset => {
+        const preset = item as LegacyFoodPreset;
+        return (
+          typeof preset?.id === "string" &&
+          typeof preset.name === "string" &&
+          typeof preset.calories === "number" &&
+          Number.isFinite(preset.calories)
+        );
+      })
+      .map((preset) => ({
+        id: preset.id,
+        name: preset.name,
+        unit: preset.amount?.trim() || "serving",
+        caloriesPerUnit: preset.calories ?? 0,
       }));
   } catch {
     return [];
   }
 }
 
-function persistPresets(presets: FoodPreset[]) {
-  localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(presets));
+function persistFoodTypes(foodTypes: FoodType[]) {
+  localStorage.setItem(FOOD_TYPES_STORAGE_KEY, JSON.stringify(foodTypes));
+}
+
+function formatNumber(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
 export default function NewFoodPage() {
   const { pet, loading: petLoading, errorMessage: petError } = usePrimaryPet();
-  const [presets, setPresets] = useState<FoodPreset[]>(loadPresets);
-  const [selectedPresetId, setSelectedPresetId] = useState("");
-  const [foodName, setFoodName] = useState("");
-  const [calories, setCalories] = useState("");
-  const [amount, setAmount] = useState("");
+  const [foodTypes, setFoodTypes] = useState<FoodType[]>(loadFoodTypes);
+  const [selectedFoodTypeId, setSelectedFoodTypeId] = useState("");
+  const [quantity, setQuantity] = useState("");
   const [notes, setNotes] = useState("");
+  const [newFoodName, setNewFoodName] = useState("");
+  const [newFoodUnit, setNewFoodUnit] = useState("");
+  const [newCaloriesPerUnit, setNewCaloriesPerUnit] = useState("");
   const [message, setMessage] = useState("");
 
-  function applyPreset(id: string) {
-    setSelectedPresetId(id);
-    if (!id) return;
-    const p = presets.find((x) => x.id === id);
-    if (!p) return;
-    setFoodName(p.name);
-    setAmount(p.amount);
-    setCalories(p.calories != null ? String(p.calories) : "");
-  }
+  const selectedFoodType = foodTypes.find(
+    (foodType) => foodType.id === selectedFoodTypeId
+  );
 
-  function clearPresetSelection() {
-    setSelectedPresetId("");
-  }
+  const totalCalories = useMemo(() => {
+    if (!selectedFoodType) return null;
+    const parsedQuantity = Number(quantity);
+    if (!quantity.trim() || Number.isNaN(parsedQuantity)) return null;
+    return parsedQuantity * selectedFoodType.caloriesPerUnit;
+  }, [quantity, selectedFoodType]);
 
-  function handleSavePreset() {
+  function handleSaveFoodType() {
     setMessage("");
-    const name = foodName.trim();
+
+    const name = newFoodName.trim();
+    const unit = newFoodUnit.trim();
+    const caloriesPerUnit = Number(newCaloriesPerUnit);
+
     if (!name) {
-      setMessage("🍽️ Enter a food name before saving a preset.");
+      setMessage("Enter a food type name before saving.");
       return;
     }
 
-    const cal = calories.trim() ? Number(calories) : null;
-    if (calories.trim() && (cal === null || Number.isNaN(cal))) {
-      setMessage("🔢 Calories must be a valid number for this preset.");
+    if (!unit) {
+      setMessage("Enter a unit of measurement for this food type.");
       return;
     }
 
-    const next: FoodPreset = {
+    if (
+      !newCaloriesPerUnit.trim() ||
+      Number.isNaN(caloriesPerUnit) ||
+      caloriesPerUnit < 0
+    ) {
+      setMessage("Calories per unit must be a valid number.");
+      return;
+    }
+
+    const duplicate = foodTypes.some(
+      (foodType) => foodType.name.trim().toLowerCase() === name.toLowerCase()
+    );
+    if (duplicate) {
+      setMessage("That food type already exists.");
+      return;
+    }
+
+    const nextFoodType: FoodType = {
       id: crypto.randomUUID(),
       name,
-      amount: amount.trim(),
-      calories: cal,
+      unit,
+      caloriesPerUnit,
     };
 
-    const updated = [...presets, next];
-    setPresets(updated);
-    persistPresets(updated);
-    setSelectedPresetId(next.id);
-    setMessage(`⭐ Saved preset “${name}”.`);
+    const updated = [...foodTypes, nextFoodType];
+    setFoodTypes(updated);
+    persistFoodTypes(updated);
+    setSelectedFoodTypeId(nextFoodType.id);
+    setQuantity("1");
+    setNewFoodName("");
+    setNewFoodUnit("");
+    setNewCaloriesPerUnit("");
+    setMessage(`Saved food type "${name}".`);
   }
 
-  function handleDeletePreset(id: string) {
-    const updated = presets.filter((p) => p.id !== id);
-    setPresets(updated);
-    persistPresets(updated);
-    if (selectedPresetId === id) {
-      setSelectedPresetId("");
+  function handleDeleteFoodType(id: string) {
+    const updated = foodTypes.filter((foodType) => foodType.id !== id);
+    setFoodTypes(updated);
+    persistFoodTypes(updated);
+    if (selectedFoodTypeId === id) {
+      setSelectedFoodTypeId("");
+      setQuantity("");
     }
-    setMessage("🧹 Preset removed.");
+    setMessage("Food type removed.");
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+
     if (!pet) {
-      setMessage(petError ?? "🐾 Pet not loaded yet.");
+      setMessage(petError ?? "Pet not loaded yet.");
       return;
     }
-    setMessage("💾 Saving...");
+
+    if (!selectedFoodType) {
+      setMessage("Choose a food type before saving this entry.");
+      return;
+    }
+
+    const parsedQuantity = Number(quantity);
+    if (!quantity.trim() || Number.isNaN(parsedQuantity) || parsedQuantity <= 0) {
+      setMessage("Enter a quantity greater than zero.");
+      return;
+    }
+
+    const calculatedCalories =
+      parsedQuantity * selectedFoodType.caloriesPerUnit;
+
+    setMessage("Saving...");
 
     const { error } = await supabase.from("food_entries").insert({
       household_id: pet.household_id,
       pet_id: pet.id,
-      food_name: foodName,
-      calories: calories ? Number(calories) : null,
-      amount: amount || null,
+      food_name: selectedFoodType.name,
+      calories: calculatedCalories,
+      amount: `${formatNumber(parsedQuantity)} ${selectedFoodType.unit}`,
       notes: notes || null,
       created_by: "Henry",
     });
@@ -131,12 +210,10 @@ export default function NewFoodPage() {
       return;
     }
 
-    setFoodName("");
-    setCalories("");
-    setAmount("");
+    setSelectedFoodTypeId("");
+    setQuantity("");
     setNotes("");
-    clearPresetSelection();
-    setMessage("🥣 Food entry saved.");
+    setMessage("Food entry saved.");
   }
 
   const formDisabled = petLoading || !pet;
@@ -144,141 +221,185 @@ export default function NewFoodPage() {
   return (
     <main className="min-h-screen p-6">
       <div className="mx-auto max-w-md space-y-6">
-        <h1 className="text-3xl font-bold">🥣 Add Food</h1>
+        <h1 className="text-3xl font-bold">Add Food</h1>
 
         {petLoading ? (
-          <p className="text-sm text-gray-600">🐾 Loading pet…</p>
+          <p className="text-sm text-gray-600">Loading pet...</p>
         ) : petError || !pet ? (
           <p className="text-sm text-red-600">
-            {petError ?? "🐾 Could not load pet."}
+            {petError ?? "Could not load pet."}
           </p>
         ) : null}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1">
-            <label className="block text-sm font-medium" htmlFor="food-preset">
-              ⚡ Quick pick
-            </label>
-            <select
-              id="food-preset"
-              value={selectedPresetId}
-              onChange={(e) => applyPreset(e.target.value)}
-              className="w-full rounded-xl border border-gray-300 bg-white p-3"
-            >
-              <option value="">✨ Custom entry</option>
-              {presets.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                  {p.amount ? ` 🥄 ${p.amount}` : ""}
-                  {p.calories != null ? ` 🔥 ${p.calories} cal` : ""}
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-gray-500">
-              ⭐ Choosing a preset fills name, amount, and calories for a usual
-              serving.
+        <section className="space-y-3 rounded-lg border border-gray-200 p-4">
+          <div>
+            <h2 className="text-lg font-semibold">Food types</h2>
+            <p className="text-sm text-gray-600">
+              Add foods like kibble, treats, Kong, or lick mat once with their
+              unit and calories.
             </p>
           </div>
 
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <label className="block text-sm font-medium">Food type name</label>
+              <input
+                value={newFoodName}
+                onChange={(e) => setNewFoodName(e.target.value)}
+                className="w-full rounded-lg border p-3"
+                placeholder="Kibble"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <label className="block text-sm font-medium">Unit</label>
+                <input
+                  value={newFoodUnit}
+                  onChange={(e) => setNewFoodUnit(e.target.value)}
+                  className="w-full rounded-lg border p-3"
+                  placeholder="cup"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-sm font-medium">
+                  Calories per unit
+                </label>
+                <input
+                  value={newCaloriesPerUnit}
+                  onChange={(e) => setNewCaloriesPerUnit(e.target.value)}
+                  className="w-full rounded-lg border p-3"
+                  placeholder="320"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                />
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleSaveFoodType}
+              className="w-full rounded-lg border border-dashed border-gray-400 p-3 text-sm font-medium text-gray-700"
+            >
+              Save Food Type
+            </button>
+          </div>
+        </section>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1">
-            <label className="block text-sm font-medium">🍽️ Food Name</label>
-            <input
-              value={foodName}
+            <label className="block text-sm font-medium" htmlFor="food-type">
+              Food type
+            </label>
+            <select
+              id="food-type"
+              value={selectedFoodTypeId}
               onChange={(e) => {
-                setFoodName(e.target.value);
-                clearPresetSelection();
+                setSelectedFoodTypeId(e.target.value);
+                setQuantity(e.target.value ? "1" : "");
               }}
-              className="w-full rounded-xl border p-3"
-              placeholder="Kibble"
+              className="w-full rounded-lg border border-gray-300 bg-white p-3"
               required
-            />
+            >
+              <option value="">Choose food type</option>
+              {foodTypes.map((foodType) => (
+                <option key={foodType.id} value={foodType.id}>
+                  {foodType.name} - {formatNumber(foodType.caloriesPerUnit)} cal
+                  / {foodType.unit}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="space-y-1">
+              <label className="block text-sm font-medium">Quantity</label>
+              <input
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                className="w-full rounded-lg border p-3"
+                disabled={!selectedFoodType}
+                min="0"
+                placeholder={selectedFoodType ? `1 ${selectedFoodType.unit}` : "1"}
+                step="0.1"
+                type="number"
+                required
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="block text-sm font-medium">Unit</label>
+              <input
+                value={selectedFoodType?.unit ?? ""}
+                className="w-full rounded-lg border bg-gray-50 p-3 text-gray-700"
+                placeholder="Choose food type"
+                readOnly
+              />
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+            <p className="text-xs font-medium uppercase text-gray-500">
+              Total calories
+            </p>
+            <p className="text-2xl font-semibold">
+              {totalCalories == null ? "--" : formatNumber(totalCalories)}
+            </p>
+            {selectedFoodType ? (
+              <p className="text-xs text-gray-500">
+                {formatNumber(selectedFoodType.caloriesPerUnit)} calories per{" "}
+                {selectedFoodType.unit}
+              </p>
+            ) : null}
           </div>
 
           <div className="space-y-1">
-            <label className="block text-sm font-medium">🔥 Calories</label>
-            <input
-              value={calories}
-              onChange={(e) => {
-                setCalories(e.target.value);
-                clearPresetSelection();
-              }}
-              className="w-full rounded-xl border p-3"
-              placeholder="250"
-              type="number"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="block text-sm font-medium">🥄 Amount</label>
-            <input
-              value={amount}
-              onChange={(e) => {
-                setAmount(e.target.value);
-                clearPresetSelection();
-              }}
-              className="w-full rounded-xl border p-3"
-              placeholder="1 cup"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="block text-sm font-medium">📝 Notes</label>
+            <label className="block text-sm font-medium">Notes</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full rounded-xl border p-3"
+              className="w-full rounded-lg border p-3"
               placeholder="Ate quickly"
               rows={4}
             />
           </div>
 
           <button
-            type="button"
-            onClick={handleSavePreset}
-            className="w-full rounded-xl border border-dashed border-gray-400 p-3 text-sm font-medium text-gray-700"
-          >
-            ⭐ Save as preset
-          </button>
-          <p className="text-xs text-gray-500 -mt-2">
-            💡 Stores the current name, amount, and calories for the dropdown
-            above (saved on this device).
-          </p>
-
-          <button
             type="submit"
             disabled={formDisabled}
-            className="w-full rounded-xl border p-3 font-medium disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-full rounded-lg border p-3 font-medium disabled:cursor-not-allowed disabled:opacity-50"
           >
-            🥣 Save Food Entry
+            Save Food Entry
           </button>
         </form>
 
-        {presets.length > 0 ? (
-          <section className="space-y-2 rounded-xl border border-gray-200 p-4">
+        {foodTypes.length > 0 ? (
+          <section className="space-y-2">
             <h2 className="text-sm font-semibold text-gray-700">
-              ⭐ Saved presets
+              Saved food types
             </h2>
             <ul className="space-y-2 text-sm">
-              {presets.map((p) => (
+              {foodTypes.map((foodType) => (
                 <li
-                  key={p.id}
-                  className="flex items-start justify-between gap-2 border-b border-gray-100 pb-2 last:border-0 last:pb-0"
+                  key={foodType.id}
+                  className="flex items-start justify-between gap-2 rounded-lg border border-gray-200 p-3"
                 >
                   <span className="text-gray-800">
-                    <span className="font-medium">{p.name}</span>
-                    {p.amount ? (
-                      <span className="text-gray-600"> 🥄 {p.amount}</span>
-                    ) : null}
-                    {p.calories != null ? (
-                      <span className="text-gray-600"> 🔥 {p.calories} cal</span>
-                    ) : null}
+                    <span className="font-medium">{foodType.name}</span>
+                    <span className="text-gray-600">
+                      {" "}
+                      {formatNumber(foodType.caloriesPerUnit)} cal /{" "}
+                      {foodType.unit}
+                    </span>
                   </span>
                   <button
                     type="button"
-                    onClick={() => handleDeletePreset(p.id)}
+                    onClick={() => handleDeleteFoodType(foodType.id)}
                     className="shrink-0 text-xs text-red-600 underline"
                   >
-                    🧹 Remove
+                    Remove
                   </button>
                 </li>
               ))}
